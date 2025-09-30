@@ -2,3 +2,5 @@
 /.idea/
 # Ignore dev database
 db.sqlite3
+# keep strava secret key out of git
+strava-key.json
