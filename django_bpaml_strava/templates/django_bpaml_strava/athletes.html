@@ -22,3 +22,10 @@
     {% endfor %}
 </table>
 {% endblock %}
+{% block nav-breadcrumbs %}
+<nav aria-label="Breadcrumbs">
+  <div class="breadcrumbs">
+    <a href="{% url 'index' %}">Athletes</a>
+  </div>
+</nav>
+{% endblock %}
