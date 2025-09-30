@@ -1,4 +1,5 @@
 {% extends 'admin/base_site.html' %}
+{% load socialaccount %}
 {% load static %}
 {% block extrastyle %}
 <link rel="stylesheet" href="{% static 'django_bpaml_strava/bpaml.css' %}">
@@ -11,7 +12,25 @@
 {% block content %}
 <div class="bpaml-content">
     {% block aside %}
-    <aside id="user-sidebar"></aside>
+    <aside class="sticky" id="user-sidebar">
+        <div class="module">
+            <table>
+                <caption>Authenticated user</caption>
+                {% if user.is_authenticated %}
+                <tr><td><div class="label">Email</div><div>{{user.email}}</div></td></tr>
+                <tr><td><div class="label">Name</div><div>{{user.first_name}} {{user.last_name}}</div></td></tr>
+                <tr><td><div><a class="btnlink" href="{% url 'index' %}">Update member details</a></div></td></tr>
+                <tr><td><div><a class="btnlink" href="{% url 'account_logout' %}">Sign out</a></div></td></tr>
+                {% else %}
+                <tr><td><div>Not logged in.</div></td></tr>
+                <tr><td><div>
+                    <a class="btnlink" href="{% provider_login_url 'strava' %}">Sign in with Strava</a>
+                    <a class="btnlink" href="{% url 'admin:login' %}?next={{request.path}}">Sign in with Django</a>
+                </div></td></tr>
+                {% endif %}
+            </table>
+        </div>
+    </aside>
     {% endblock %}
     <div class="bpaml-main">
     {% block main %}{% endblock %}
