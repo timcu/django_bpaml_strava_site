@@ -1,0 +1,4 @@
+# ignore jetbrains project files so not tied to pycharm
+/.idea/
+# Ignore dev database
+db.sqlite3
