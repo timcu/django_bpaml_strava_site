@@ -1,0 +1,8 @@
+.bpaml-content {font-size: 1.0em;}
+.bpaml-content .btnlink {padding: 7px; background: var(--button-bg); border: none; border-radius: 4px; color: var(--button-fg); vertical-align: middle; font-family: var(--font-family-primary); font-size: 0.8125rem;}
+#user-sidebar .label {font-size: 0.7em;}
+#user-sidebar {z-index: 15; flex: 0 0 275px; border-top: 1px solid transparent; border-right: 1px solid var(--hairline-color); background-color: var(--body-bg); overflow: auto;}
+#user-sidebar table {width: 100%;}
+#user-sidebar .module td {white-space: nowrap;}
+#content > .bpaml-content {display: flex; flex: 1 0 auto;}
+.bpaml-content .bpaml-main {padding-left: 10px;}

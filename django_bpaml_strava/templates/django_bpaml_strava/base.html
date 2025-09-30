@@ -1,0 +1,20 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+{% block extrastyle %}
+<link rel="stylesheet" href="{% static 'django_bpaml_strava/bpaml.css' %}">
+{% endblock %}
+{% block title %}BPAML{% endblock %}
+{% block branding %}
+<div id="site-name"><a href="{% url 'index' %}">{{ site_header|default:_('BPAML Strava') }}</a></div>
+{% include "admin/color_theme_toggle.html" %}
+{% endblock %}
+{% block content %}
+<div class="bpaml-content">
+    {% block aside %}
+    <aside id="user-sidebar"></aside>
+    {% endblock %}
+    <div class="bpaml-main">
+    {% block main %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

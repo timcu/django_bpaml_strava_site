@@ -1,0 +1,8 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% block main %}
+<h1>BPAML</h1>
+<ul>
+    <li><a href="{% url 'index' %}">BPAML Strava</a></li>
+    <li><a href="{% url 'admin:index' %}">BPAML Admin</a></li>
+</ul>
+{% endblock %}
