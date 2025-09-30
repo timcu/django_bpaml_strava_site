@@ -27,11 +27,20 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
+AUTHENTICATION_BACKENDS = [
+    # Needed to log in by username in Django admin, regardless of `allauth`
+    'django.contrib.auth.backends.ModelBackend',
+    # `allauth` specific authentication methods, such as login by email
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
 # Application definition
 
 INSTALLED_APPS = [
     'django_bpaml_strava.apps.DjangoBpamlStravaConfig',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.strava',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -48,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'django_bpaml_strava_site.urls'
@@ -126,3 +136,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # fields: strava_id, parkrun_id
 # relationships: to many activities
 AUTH_USER_MODEL = 'django_bpaml_strava.User'
+
+SOCIALACCOUNT_PROVIDERS = {'strava': {'SCOPE': ['read,activity:read']}}
+
+LOGIN_REDIRECT_URL = "/bpaml-strava/"
+LOGOUT_REDIRECT_URL = "/bpaml-strava/"
+
+# Extend Django default logging to also log to console at level INFO rather than WARNING
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
+
+DATE_FORMAT = 'D d M Y'

@@ -1,0 +1,58 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% block main %}
+{% if user.is_authenticated %}
+<h2>Athlete</h2>
+<table>
+    <tr>
+        <td>Name:</td>
+        <td>{{ athlete.user.first_name }} {{ athlete.user.last_name }}</td>
+    </tr>
+    <tr>
+        <td>Strava ID: </td>
+        <td>{{ athlete.uid }}</td>
+    </tr>
+    <tr>
+        <td>Parkrun ID:</td>
+        <td>{{ athlete.user.parkrun_id }}</td>
+    </tr>
+</table>
+<h2>Saved activities</h2>
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Date</th>
+        <th>Start time</th>
+        <th>Description</th>
+        <th>Distance</th>
+        <th>Strava duration</th>
+        <th>Parkrun duration</th>
+        <th>Parkrun location</th>
+        <th>Action</th>
+    </tr>
+    {% for activity in athlete.user.activity_set.all %}
+    <tr>
+        <td>{{ activity.activity_id }}</td>
+        <td>{{ activity.date|date:"D d M Y" }}</td>
+        <td>{{ activity.start_time_local|date:"D d M Y H:i" }} {{activity.timezone}}</td>
+        <td>{{ activity.title }}</td>
+        <td>{{ activity.distance }}</td>
+        <td>{{ activity.strava_duration }}</td>
+        <td>{{ activity.parkrun_duration }}</td>
+        <td>{{ activity.parkrun_location }}</td>
+        <td><a href="{% url 'delete-activity' athlete.uid activity.activity_id %}">delete</a></td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>Please sign in to update member details</p>
+{% endif %}
+{% endblock %}
+{% block nav-breadcrumbs %}
+<nav aria-label="Breadcrumbs">
+  <div class="breadcrumbs">
+    <a href="{% url 'index' %}">Athletes</a>
+    &gt;
+    <a href="{% url 'athlete' athlete.uid %}">{{ athlete.user.first_name }} {{ athlete.user.last_name }}</a>
+  </div>
+</nav>
+{% endblock %}

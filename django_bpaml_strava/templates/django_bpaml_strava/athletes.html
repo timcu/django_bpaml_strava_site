@@ -1,0 +1,24 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% block main %}
+<h1>BPAML Strava athletes</h1>
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Strava ID</th>
+        <th>Parkrun ID</th>
+        <th>Activities</th>
+        <th>action</th>
+    </tr>
+    {% for athlete in athletes %}
+        <tr>
+            <td>{{athlete.user.first_name}} {{athlete.user.last_name}}</td>
+            <td>{{athlete.uid}}</td>
+            <td>{{athlete.user.parkrun_id}}</td>
+            <td>{{athlete.user.activity_set.count}}</td>
+            <td>
+                <a href="{% url 'view-activities' athlete.uid %}">view activities</a>
+            </td>
+        </tr>
+    {% endfor %}
+</table>
+{% endblock %}
