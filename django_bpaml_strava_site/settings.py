@@ -121,3 +121,8 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Override the provided user model for our use adding
+# fields: strava_id, parkrun_id
+# relationships: to many activities
+AUTH_USER_MODEL = 'django_bpaml_strava.User'
