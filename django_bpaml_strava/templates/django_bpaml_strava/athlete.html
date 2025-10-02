@@ -43,6 +43,33 @@
     </tr>
     {% endfor %}
 </table>
+{% if list_strava_activities %}
+<h2>Other strava activities</h2>
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Date</th>
+        <th>Start time</th>
+        <th>Description</th>
+        <th>Distance</th>
+        <th>Strava duration</th>
+        <th>Action</th>
+    </tr>
+    {% for activity in list_strava_activities %}
+    <tr>
+        <td>{{ activity.id }}</td>
+        <td>{{ activity.start_date_local }}</td>
+        <td>{{ activity.moving_time }}</td>
+        <td>{{ activity.name }}</td>
+        <td>{{ activity.distance }}</td>
+        <td>{{ activity.elapsed_time }}</td>
+        <td>TODO hyperlink to save</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p><a href="{% url 'view-unsaved-activities-available-on-strava' athlete.uid %}">view unsaved activities available on strava</a> </p>
+{% endif %}
 {% else %}
 <p>Please sign in to update member details</p>
 {% endif %}

@@ -139,6 +139,8 @@ AUTH_USER_MODEL = 'django_bpaml_strava.User'
 
 SOCIALACCOUNT_PROVIDERS = {'strava': {'SCOPE': ['read,activity:read']}}
 
+SOCIALACCOUNT_STORE_TOKENS = True
+
 LOGIN_REDIRECT_URL = "/bpaml-strava/"
 LOGOUT_REDIRECT_URL = "/bpaml-strava/"
 
