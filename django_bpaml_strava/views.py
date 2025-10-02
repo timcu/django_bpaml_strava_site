@@ -101,3 +101,57 @@ def fetch_and_view_activities(request, strava_id):
     # display the results
     context = {'athlete': social_account, 'list_strava_activities': list_new_strava_activities}
     return render(request, 'django_bpaml_strava/athlete.html', context)
+
+
+def create_activity_from_strava(user: User, dct_activity):
+    """
+    Given the json data for a single activity from Strava (already converted to a dict)
+    create an Activity record linked to the correct User and save in the database.
+    """
+    list_timezone = dct_activity['timezone'].split(' ')
+    timezone = list_timezone[1]
+    start_time = datetime.datetime.strptime(dct_activity["start_date"], "%Y-%m-%dT%H:%M:%SZ").astimezone(zoneinfo.ZoneInfo(timezone))
+    start_time_local = datetime.datetime.strptime(dct_activity["start_date_local"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=zoneinfo.ZoneInfo(timezone))
+    start_date = start_time.date()
+    logger.info(f'{start_time:%d-%b-%Y %H:%M} {start_time_local:%d-%b-%Y %H:%M %z} {dct_activity["distance"] / 1000:6.1f}km {dct_activity["name"]}')
+    activity = Activity.objects.create(
+        athlete=user,
+        activity_id=dct_activity["id"],
+        date=start_date,
+        start_time=start_time,
+        start_time_local=start_time_local.replace(tzinfo=None),
+        timezone=timezone,
+        distance=dct_activity["distance"],
+        title=dct_activity["name"],
+        strava_duration=datetime.timedelta(seconds=dct_activity["elapsed_time"]),
+        polyline=dct_activity["map"]["summary_polyline"],
+    )
+    activity.save()
+
+
+@login_required
+def save_activity(request, strava_id, activity_id):
+    social_account = social_account_with_sorted_activities(strava_id)
+    social_token = fetch_strava_token(strava_id)
+    # Define the endpoint and headers to fetch a single activity
+    url = f'https://www.strava.com/api/v3/activities/{activity_id}'
+    headers = {'Authorization': f'Bearer {social_token.token}'}
+
+    # Define parameters for the request. We don't need all efforts for this activity
+    params = {
+        'include_all_efforts': False,
+    }
+
+    # Make the GET request with parameters for single activity
+    response = requests.get(url, headers=headers, params=params)
+
+    # Check if the request was successful
+    if response.ok:
+        dct_activity = response.json()
+        logger.info(f"Activity for authorized user: {dct_activity}")
+        # add activity to user
+        create_activity_from_strava(social_account.user, dct_activity)
+    else:
+        logger.warning(f"Error requesting activities from strava {response.status_code}: {response.text}")
+    # requery db to include new activity
+    return view_activities(request, strava_id)

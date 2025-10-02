@@ -63,7 +63,7 @@
         <td>{{ activity.name }}</td>
         <td>{{ activity.distance }}</td>
         <td>{{ activity.elapsed_time }}</td>
-        <td>TODO hyperlink to save</td>
+        <td><a href="{% url 'save-activity' athlete.uid activity.id %}">save</a></td>
     </tr>
     {% endfor %}
 </table>
