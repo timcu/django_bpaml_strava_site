@@ -195,3 +195,8 @@ def fetch_and_save_activities(request, strava_id):
     return redirect('view-activities', strava_id=strava_id)
 
 
+@login_required
+def delete_activities(request, strava_id):
+    social_account = social_account_with_sorted_activities(strava_id)
+    social_account.user.activity_set.all().delete()
+    return redirect('view-activities', strava_id=strava_id)
