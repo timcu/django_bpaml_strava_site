@@ -43,6 +43,9 @@
     </tr>
     {% endfor %}
 </table>
+<p>
+    <a href="{% url 'save-activities' athlete.uid %}">fetch Saturday activities for this athlete</a>
+</p>
 {% if list_strava_activities %}
 <h2>Other strava activities</h2>
 <table>

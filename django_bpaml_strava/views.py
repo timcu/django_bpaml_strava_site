@@ -170,3 +170,28 @@ def delete_activity(request, strava_id, activity_id):
         logger.error("Activity not found")
     return redirect('view-activities', strava_id=strava_id)
 
+
+@login_required
+def fetch_and_save_activities(request, strava_id):
+    """Fetch activities from strava, filter out non-parkrun events and save the rest if nothing else
+    already saved for that date"""
+    lst_strava_activities = fetch_activities_from_strava(strava_id)
+    if lst_strava_activities is None:
+        return index_page(request)
+    social_account = social_account_with_sorted_activities(strava_id)
+    set_saturday = set(a.date for a in social_account.user.activity_set.all())
+    for dct_activity in lst_strava_activities:
+        # timezone looks like '(GMT+10:00) Australia/Brisbane'
+        list_timezone = dct_activity['timezone'].split(' ')
+        timezone = list_timezone[1]
+        start_time = datetime.datetime.strptime(dct_activity["start_date"], "%Y-%m-%dT%H:%M:%SZ").astimezone(
+            zoneinfo.ZoneInfo(timezone))
+        start_date = start_time.date()
+        latest_start_time = start_time.replace(hour=7, minute=10, second=0, microsecond=0)
+        # Find last start on each Saturday before 7:10am local time that is between 4.7km and 5.3km
+        if start_date not in set_saturday and start_time.weekday() == 5 and start_time < latest_start_time and 4700 < dct_activity["distance"] < 5300:
+            set_saturday.add(start_date)
+            create_activity_from_strava(social_account.user, dct_activity)
+    return redirect('view-activities', strava_id=strava_id)
+
+
