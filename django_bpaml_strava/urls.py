@@ -1,6 +1,7 @@
 from django.urls import path
 from django_bpaml_strava.views import index_page, athlete_page, view_activities
 from django_bpaml_strava.views import fetch_and_view_activities, save_activity
+from django_bpaml_strava.views import delete_activity
 
 urlpatterns = [
   path('', index_page, name='index'),
@@ -8,4 +9,5 @@ urlpatterns = [
   path('view-activities/athlete/<int:strava_id>', view_activities, name='view-activities'),
   path('view-unsaved-activities-available-on-strava/athlete/<int:strava_id>', fetch_and_view_activities, name='view-unsaved-activities-available-on-strava'),
   path('save-activity/athlete/<int:strava_id>/activity/<int:activity_id>', save_activity, name='save-activity'),
+  path('delete-activity/athlete/<int:strava_id>/activity/<int:activity_id>', delete_activity, name='delete-activity'),
 ]

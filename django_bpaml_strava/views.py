@@ -3,7 +3,7 @@ import logging
 import requests
 import zoneinfo
 from allauth.socialaccount.models import SocialAccount
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Prefetch
 from django.contrib.auth.decorators import login_required
 from django_bpaml_strava.models import Activity, User
@@ -154,4 +154,19 @@ def save_activity(request, strava_id, activity_id):
     else:
         logger.warning(f"Error requesting activities from strava {response.status_code}: {response.text}")
     # requery db to include new activity
-    return view_activities(request, strava_id)
+    return redirect("view-activities", strava_id=strava_id)
+
+
+@login_required
+def delete_activity(request, strava_id, activity_id):
+    social_account = social_account_with_sorted_activities(strava_id)
+    for a in social_account.user.activity_set.all():
+        if a.activity_id == activity_id:
+            a.delete()
+            logger.info(f"Deleted activity {a.activity_id}")
+            break
+        logger.info(f"activity {a.activity_id} != {activity_id}")
+    else:
+        logger.error("Activity not found")
+    return redirect('view-activities', strava_id=strava_id)
+
