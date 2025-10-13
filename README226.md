@@ -1,4 +1,4 @@
-# MeetUp 226 - Beginners Python and Machine Learning - Wed 19 Oct 2025 - Django and Strava tokens with PyCharm
+# MeetUp 226 - Beginners Python and Machine Learning - Wed 19 Nov 2025 - Django and Strava tokens with PyCharm
 
 ## Part 1 - 15 Oct 2025 - Writing a Django Web App and authenticating with Strava - Set up project and database
 
