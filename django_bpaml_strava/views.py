@@ -6,6 +6,8 @@ from allauth.socialaccount.models import SocialAccount
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Prefetch
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from django_bpaml_strava.models import Activity, User
 
 from django_bpaml_strava.strava_token import fetch_strava_token
@@ -200,3 +202,16 @@ def delete_activities(request, strava_id):
     social_account = social_account_with_sorted_activities(strava_id)
     social_account.user.activity_set.all().delete()
     return redirect('view-activities', strava_id=strava_id)
+
+
+@login_required()
+def member(request):
+    if request.method == "POST":
+        user = request.user
+        user.first_name = request.POST.get("first-name", user.first_name)
+        user.last_name = request.POST.get("last-name", user.last_name)
+        user.parkrun_id = request.POST.get("parkrun-id", user.parkrun_id)
+        user.save()
+        return HttpResponseRedirect(reverse("index"))
+    else:
+        return render(request, "django_bpaml_strava/member.html", context={})

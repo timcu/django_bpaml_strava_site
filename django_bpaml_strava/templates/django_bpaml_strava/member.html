@@ -1,0 +1,27 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% block main %}
+{% if user.is_authenticated %}
+<h2>Authenticated user</h2>
+<form action="{% url 'member-edit' %}" method="post">
+{% csrf_token %}
+    <table>
+        <tr>
+            <td>Email: </td>
+            <td>{{ user.email }}</td>
+        </tr>
+        <tr>
+            <td>Name:</td>
+            <td><input type="text" name="first-name" value="{{ user.first_name }}" size="20"><input type="text" name="last-name" value="{{ user.last_name }}" size="20"></td>
+        </tr>
+        <tr>
+            <td>Parkrun ID:</td>
+            <td>A<input type="text" name="parkrun-id" value="{{ user.parkrun_id }}" size="47"></td>
+            <td>Your parkrun id excluding the initial letter "A"</td>
+        </tr>
+    </table>
+    <input type="submit" value="Save">
+</form>
+{% else %}
+<p>Please sign in to update member details</p>
+{% endif %}
+{% endblock %}

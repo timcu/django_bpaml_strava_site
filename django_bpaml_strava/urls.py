@@ -4,6 +4,7 @@ from django_bpaml_strava.views import fetch_and_view_activities, save_activity
 from django_bpaml_strava.views import delete_activity
 from django_bpaml_strava.views import fetch_and_save_activities
 from django_bpaml_strava.views import delete_activities
+from django_bpaml_strava.views import member
 
 urlpatterns = [
   path('', index_page, name='index'),
@@ -14,4 +15,5 @@ urlpatterns = [
   path('delete-activity/athlete/<int:strava_id>/activity/<int:activity_id>', delete_activity, name='delete-activity'),
   path('save-activities/athlete/<int:strava_id>', fetch_and_save_activities, name='save-activities'),
   path('delete-activities/athlete/<int:strava_id>', delete_activities, name='delete-activities'),
+  path('member-edit/', member, name='member-edit'),
 ]
