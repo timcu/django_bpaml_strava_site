@@ -1,4 +1,5 @@
 {% extends 'django_bpaml_strava/base.html' %}
+{% load tz %}
 {% block main %}
 {% if user.is_authenticated %}
 <h2>Athlete</h2>
@@ -33,46 +34,57 @@
     <tr>
         <td>{{ activity.activity_id }}</td>
         <td>{{ activity.date|date:"D d M Y" }}</td>
-        <td>{{ activity.start_time_local|date:"D d M Y H:i" }} {{activity.timezone}}</td>
+        <td>{% if activity.start_time_local %}{{ activity.start_time_local|date:"H:i" }} {{activity.timezone}}{% endif %}</td>
         <td>{{ activity.title }}</td>
         <td>{{ activity.distance }}</td>
-        <td>{{ activity.strava_duration }}</td>
+        <td>{% if activity.strava_duration %}{{ activity.strava_duration }}{% endif %}</td>
         <td>{{ activity.parkrun_duration }}</td>
-        <td>{{ activity.parkrun_location }}</td>
-        <td><a href="{% url 'delete-activity' athlete.uid activity.activity_id %}">delete</a></td>
+        <td>{{ activity.location }}</td>
+        <td><a href="{% url 'delete-activity' athlete.uid activity.activity_id %}" title="does not delete from strava">delete</a></td>
     </tr>
     {% endfor %}
 </table>
 <p>
-    <a href="{% url 'save-activities' athlete.uid %}">fetch Saturday activities for this athlete</a>
-    | <a href="{% url 'delete-activities' athlete.uid %}">delete saved activities for this athlete</a>
+    <a href="{% url 'save-activities' athlete.uid %}" title="Saturday activities only for this athlete from Strava">fetch Strava activities</a>
+</p>
+<p>
+    {% if user.parkrun_id %}
+      <a href="{% url 'save-parkruns' athlete.uid %}" title="from Parkrun for this athlete">fetch Parkrun results</a>
+    {% else %}
+      <em title="edit member details and set Parkrun ID to be able to fetch Parkrun results">No Parkrun ID</em>
+    {% endif %}
+</p>
+<p>
+    <a href="{% url 'delete-activities' athlete.uid %}" title="only deletes activities for this athlete from local database. does not delete from strava">delete saved activities</a> (does not delete from strava)
 </p>
 {% if list_strava_activities %}
 <h2>Other strava activities</h2>
 <table>
     <tr>
         <th>ID</th>
-        <th>Date</th>
-        <th>Start time</th>
+        <th>Local start time</th>
         <th>Description</th>
-        <th>Distance</th>
-        <th>Strava duration</th>
+        <th>Distance (m)</th>
+        <th>Duration (s)</th>
+        <th>Moving time (s)</th>
         <th>Action</th>
     </tr>
     {% for activity in list_strava_activities %}
     <tr>
         <td>{{ activity.id }}</td>
-        <td>{{ activity.start_date_local }}</td>
-        <td>{{ activity.moving_time }}</td>
+        <td>
+            <div>{{ activity.start_time_local|date:"D d M Y H:i" }}</div>
+        </td>
         <td>{{ activity.name }}</td>
         <td>{{ activity.distance }}</td>
         <td>{{ activity.elapsed_time }}</td>
+        <td>{{ activity.moving_time }}</td>
         <td><a href="{% url 'save-activity' athlete.uid activity.id %}">save</a></td>
     </tr>
     {% endfor %}
 </table>
 {% else %}
-<p><a href="{% url 'view-unsaved-activities-available-on-strava' athlete.uid %}">view unsaved activities available on strava</a> </p>
+<p><a href="{% url 'view-unsaved-activities-available-on-strava' athlete.uid %}" title="including those outside normal distance or start time requirements">view unsaved activities available on strava</a> (for manual saving)</p>
 {% endif %}
 {% else %}
 <p>Please sign in to update member details</p>

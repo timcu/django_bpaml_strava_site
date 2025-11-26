@@ -19,16 +19,17 @@ class Activity(models.Model):
     athlete = models.ForeignKey(User, on_delete=models.CASCADE)
     activity_id = models.IntegerField(null=True)
     date = models.DateField("date of activity")
-    start_time = models.DateTimeField("start date and time in UTC")
+    start_time = models.DateTimeField("start date and time in UTC", null=True)
     start_time_local = models.DateTimeField("start date and time in local timezone", null=True, blank=True)
     timezone = models.CharField(max_length=200, default="UTC")
     title = models.CharField(max_length=200)
-    location = models.CharField(max_length=200)  # parkrun location
+    location = models.CharField("Parkrun location", max_length=200)
     description = models.CharField(max_length=4000)
     parkrun_duration = models.DurationField(default=None, null=True, blank=True)
     strava_duration = models.DurationField(default=None, null=True, blank=True)
-    distance = models.FloatField(default=0)  # metres
+    distance = models.FloatField(default=0, null=True, blank=True)  # metres
     polyline = models.CharField(max_length=4000)
+    volunteer_event = models.IntegerField("Event number volunteered at that parkrun location", null=True, blank=True)
 
     def __str__(self):
         return self.title
