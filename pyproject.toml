@@ -1,0 +1,54 @@
+[project]
+name = "django-bpaml-strava"
+dynamic = ["version"]
+authors = [
+    {name = "D Tim Cummings", email = "pythonatordev@gmail.com"},
+]
+description = "A Django app to accept registrations for upcoming events using Google login"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">= 3.10"
+keywords = ["bpaml", "strava", "oauth", "django", "beginners' python"]
+dependencies = [
+    "Django ~= 5.2.8",
+    "django-allauth[socialaccount] ~= 65.13.1",
+    "beautifulsoup4 ~= 4.14.2",
+    "lxml ~= 6.0.2",
+    "requests ~= 2.32.5",
+    "gunicorn ~= 23.0.0",
+    "psycopg ~= 3.2.13",
+]
+
+classifiers =[
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 5.2.8",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+
+[project.urls]
+homepage = "https://strava.pythonator.com/bpaml-strava/"
+repository = "https://github.com/timcu/django_bpaml_strava_site"
+
+[build-system]
+requires = ['setuptools>=80.9.0', "wheel>=0.45.1", "setuptools-scm[toml]>=9.2.2"]
+build-backend = 'setuptools.build_meta'
+
+[tool.setuptools_scm]
+version_file = "django_bpaml_strava/_version.py"
+
+[tool.setuptools.packages.find]
+include = ["django_bpaml_strava*"]

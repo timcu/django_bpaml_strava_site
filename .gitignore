@@ -4,3 +4,6 @@
 db.sqlite3
 # keep strava secret key out of git
 strava-key.json
+django_bpaml_strava/_version.py
+/dist/
+/django_bpaml_strava.egg-info/

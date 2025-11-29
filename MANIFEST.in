@@ -1,0 +1,4 @@
+# setuptools_scm includes all files in git so need to exclude some
+recursive-exclude .idea *
+recursive-exclude django_bpaml_strava_site *
+exclude manage.py requirements.txt
