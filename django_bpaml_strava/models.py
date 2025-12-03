@@ -9,7 +9,7 @@ class User(AbstractUser):
     # add extra fields to AbstractUser to make User
     # null=True means field can be empty in database
     # blank=True means field can be empty in django forms
-    parkrun_id = models.IntegerField(null=True, blank=True)
+    parkrun_id = models.BigIntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.email}<{self.first_name} {self.last_name}>"
@@ -17,7 +17,7 @@ class User(AbstractUser):
 # Need to define Activity second because it refers to User
 class Activity(models.Model):
     athlete = models.ForeignKey(User, on_delete=models.CASCADE)
-    activity_id = models.IntegerField(null=True)
+    activity_id = models.BigIntegerField(null=True)
     date = models.DateField("date of activity")
     start_time = models.DateTimeField("start date and time in UTC", null=True)
     start_time_local = models.DateTimeField("start date and time in local timezone", null=True, blank=True)
@@ -29,7 +29,7 @@ class Activity(models.Model):
     strava_duration = models.DurationField(default=None, null=True, blank=True)
     distance = models.FloatField(default=0, null=True, blank=True)  # metres
     polyline = models.CharField(max_length=4000)
-    volunteer_event = models.IntegerField("Event number volunteered at that parkrun location", null=True, blank=True)
+    volunteer_event = models.BigIntegerField("Event number volunteered at that parkrun location", null=True, blank=True)
 
     def __str__(self):
         return self.title
