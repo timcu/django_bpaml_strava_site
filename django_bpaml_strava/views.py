@@ -20,6 +20,11 @@ BASE_TZ = zoneinfo.ZoneInfo("Australia/Brisbane")
 def index_page(request):
     """Find all athletes """
     list_social_accounts = SocialAccount.objects.filter(provider='strava').select_related('user')
+    for sa in list_social_accounts:
+        if sa.user == request.user or request.user.is_staff:
+            sa.is_authenticated = request.user.is_authenticated
+        else:
+            sa.is_authenticated = False
     context = {'athletes': list_social_accounts}
     return render(request, 'django_bpaml_strava/athletes.html', context)
 

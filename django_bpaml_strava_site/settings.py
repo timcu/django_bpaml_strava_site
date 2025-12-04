@@ -141,8 +141,8 @@ SOCIALACCOUNT_PROVIDERS = {'strava': {'SCOPE': ['read,activity:read']}}
 
 SOCIALACCOUNT_STORE_TOKENS = True
 
-LOGIN_REDIRECT_URL = "/bpaml-strava/"
-LOGOUT_REDIRECT_URL = "/bpaml-strava/"
+LOGIN_REDIRECT_URL = "/betty/"
+LOGOUT_REDIRECT_URL = "/betty/"
 
 # Extend Django default logging to also log to console at level INFO rather than WARNING
 LOGGING = {

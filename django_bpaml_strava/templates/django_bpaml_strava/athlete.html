@@ -48,7 +48,7 @@
     <a href="{% url 'save-activities' athlete.uid %}" title="Saturday activities only for this athlete from Strava">fetch Strava activities</a>
 </p>
 <p>
-    {% if user.parkrun_id %}
+    {% if athlete.user.parkrun_id %}
       <a href="{% url 'save-parkruns' athlete.uid %}" title="from Parkrun for this athlete">fetch Parkrun results</a>
     {% else %}
       <em title="edit member details and set Parkrun ID to be able to fetch Parkrun results">No Parkrun ID</em>
