@@ -15,7 +15,7 @@
         </tr>
         <tr>
             <td>Parkrun ID:</td>
-            <td>A<input type="text" name="parkrun-id" value="{{ user.parkrun_id }}" size="47"></td>
+            <td>A<input type="text" name="parkrun-id" value="{{ user.parkrun_id|default_if_none:'' }}" size="47"></td>
             <td>Your Parkrun id excluding the initial letter "A" authorising this app to fetch your Parkrun results</td>
         </tr>
     </table>

@@ -6,3 +6,4 @@
 #user-sidebar .module td {white-space: nowrap;}
 #content > .bpaml-content {display: flex; flex: 1 0 auto;}
 .bpaml-content .bpaml-main {padding-left: 10px;}
+.bpaml-instructions {margin-top: 5em;}

@@ -34,6 +34,17 @@
     {% endblock %}
     <div class="bpaml-main">
     {% block main %}{% endblock %}
+        <div class="bpaml-instructions">
+        {% if user.is_authenticated %}
+        {% if not user.parkrun_id %}
+        <p>Please [update member details] above and provide Parkrun ID so that Parkrun results can be fetched automatically</p>
+        <p>By providing the Parkrun ID, user is explicitly consenting to their results being collected from Parkrun</p>
+        {% endif %}
+        {% else %}
+        <p>By signing in with Strava, user is explicitly consenting this app to collect their Strava activity data.</p>
+        <p>User can delete their saved Strava activity data by clicking on link [delete saved activities] on their activities page</p>
+        {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}

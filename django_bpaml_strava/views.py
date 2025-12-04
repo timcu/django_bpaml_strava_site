@@ -346,7 +346,7 @@ def member(request):
         user = request.user
         user.first_name = request.POST.get("first-name", user.first_name)
         user.last_name = request.POST.get("last-name", user.last_name)
-        user.parkrun_id = request.POST.get("parkrun-id", user.parkrun_id)
+        user.parkrun_id = request.POST.get("parkrun-id") or None  # converts empty string to None
         user.save()
         return HttpResponseRedirect(reverse("index"))
     else:

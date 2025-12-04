@@ -18,7 +18,7 @@
             <td>{{athlete.user.first_name}} {{athlete.user.last_name}}</td>
             {% if user.is_authenticated %}
             <td>{% if athlete.is_authenticated %}{{athlete.uid}}{% endif %}</td>
-            <td>{% if athlete.is_authenticated %}{{athlete.user.parkrun_id}}{% endif %}</td>
+            <td>{% if athlete.is_authenticated %}{{athlete.user.parkrun_id|default_if_none:''}}{% endif %}</td>
             {% endif %}
             <td>{{athlete.user.activity_set.count}}</td>
             {% if user.is_authenticated %}

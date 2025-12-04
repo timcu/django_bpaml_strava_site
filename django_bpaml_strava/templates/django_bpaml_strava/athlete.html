@@ -14,7 +14,7 @@
     </tr>
     <tr>
         <td>Parkrun ID:</td>
-        <td>{{ athlete.user.parkrun_id }}</td>
+        <td>{{ athlete.user.parkrun_id|default_if_none:'' }}</td>
     </tr>
 </table>
 <h2>Saved activities</h2>
