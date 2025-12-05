@@ -24,6 +24,7 @@
         <th>Date</th>
         <th>Start time</th>
         <th>Description</th>
+        <th>Device name</th>
         <th>Distance</th>
         <th>Strava duration</th>
         <th>Parkrun duration</th>
@@ -36,6 +37,7 @@
         <td>{{ activity.date|date:"D d M Y" }}</td>
         <td>{% if activity.start_time_local %}{{ activity.start_time_local|date:"H:i" }} {{activity.timezone}}{% endif %}</td>
         <td>{{ activity.title }}</td>
+        <td>{{ activity.device_name }}</td>
         <td>{{ activity.distance }}</td>
         <td>{% if activity.strava_duration %}{{ activity.strava_duration }}{% endif %}</td>
         <td>{{ activity.parkrun_duration }}</td>
@@ -64,6 +66,7 @@
         <th>ID</th>
         <th>Local start time</th>
         <th>Description</th>
+        <th>Device name</th>
         <th>Distance (m)</th>
         <th>Duration (s)</th>
         <th>Moving time (s)</th>
@@ -76,6 +79,7 @@
             <div>{{ activity.start_time_local|date:"D d M Y H:i" }}</div>
         </td>
         <td>{{ activity.name }}</td>
+        <td>{{ activity.device_name }}</td>
         <td>{{ activity.distance }}</td>
         <td>{{ activity.elapsed_time }}</td>
         <td>{{ activity.moving_time }}</td>
