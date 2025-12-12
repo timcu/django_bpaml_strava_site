@@ -10,9 +10,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from django_bpaml_strava.models import Activity
 
+from django_bpaml_strava.models import Activity
 from django_bpaml_strava.strava_token import fetch_strava_token
+from django_bpaml_strava.version import version
 
 logger = logging.getLogger(__name__)
 BASE_TZ = zoneinfo.ZoneInfo("Australia/Brisbane")

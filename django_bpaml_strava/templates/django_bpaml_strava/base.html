@@ -1,10 +1,11 @@
 {% extends 'admin/base_site.html' %}
 {% load socialaccount %}
 {% load static %}
+{% load version_tag %}
 {% block extrastyle %}
 <link rel="stylesheet" href="{% static 'django_bpaml_strava/bpaml.css' %}">
 {% endblock %}
-{% block title %}BPAML{% endblock %}
+{% block title %}Betty{% endblock %}
 {% block branding %}
 <div id="site-name"><a href="{% url 'index' %}">{{ site_header|default:_("Betty's challenge") }}</a></div>
 {% include "admin/color_theme_toggle.html" %}
@@ -47,4 +48,7 @@
         </div>
     </div>
 </div>
+{% endblock %}
+{% block footer %}
+<div>Version {% app_version %}</div>
 {% endblock %}
