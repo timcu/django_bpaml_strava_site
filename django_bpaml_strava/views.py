@@ -142,7 +142,7 @@ def create_activity_from_strava(social_account: SocialAccount, dct_activity):
         a.title=dct_activity["name"]
         a.strava_duration=datetime.timedelta(seconds=dct_activity["elapsed_time"])
         a.polyline=dct_activity["map"]["summary_polyline"]
-        a.device_name=dct_activity["device_name"]
+        a.device_name=dct_activity.get("device_name", "no device")
     else:
         logger.info("creating new activity")
         a = Activity.objects.create(
@@ -156,7 +156,7 @@ def create_activity_from_strava(social_account: SocialAccount, dct_activity):
             title=dct_activity["name"],
             strava_duration=datetime.timedelta(seconds=dct_activity["elapsed_time"]),
             polyline=dct_activity["map"]["summary_polyline"],
-            device_name=dct_activity["device_name"],
+            device_name=dct_activity.get("device_name", "no device"),
         )
     a.save()
     return a
