@@ -345,12 +345,33 @@ def delete_activities(request, strava_id):
 
 @login_required()
 def member(request):
+    """Update member details for currently logged-in user
+
+    First name
+    Last name
+    Parkrun ID
+    Goal Duration
+    """
     if request.method == "POST":
         user = request.user
         user.first_name = request.POST.get("first-name", user.first_name)
         user.last_name = request.POST.get("last-name", user.last_name)
         user.parkrun_id = request.POST.get("parkrun-id") or None  # converts empty string to None
+        if request.POST.get("goal-minutes") == "":
+            user.goal_duration = None
+        else:
+            seconds = int(request.POST.get("goal-minutes")) * 60
+            if request.POST.get("goal-seconds") != "":
+                seconds += int(request.POST.get("goal-seconds"))
+            user.goal_duration = datetime.timedelta(seconds=int(seconds))
         user.save()
         return HttpResponseRedirect(reverse("index"))
     else:
-        return render(request, "django_bpaml_strava/member.html", context={})
+        if request.user.goal_duration is None:
+            goal_minutes = 25
+            goal_seconds = 0
+        else:
+            goal_minutes = int(request.user.goal_duration.total_seconds() // 60)
+            goal_seconds = int(request.user.goal_duration.total_seconds() % 60)
+        context = {"goal_minutes": goal_minutes, "goal_seconds": goal_seconds}
+        return render(request, "django_bpaml_strava/member.html", context=context)

@@ -15,8 +15,17 @@
         </tr>
         <tr>
             <td>Parkrun ID:</td>
-            <td>A<input type="text" name="parkrun-id" value="{{ user.parkrun_id|default_if_none:'' }}" size="47"></td>
+            <td>A<input type="text" name="parkrun-id" value="{{ user.parkrun_id|default_if_none:'' }}" size="10"></td>
             <td>Your Parkrun id excluding the initial letter "A" authorising this app to fetch your Parkrun results</td>
+        </tr>
+        <tr>
+            <td>Goal time:</td>
+            <td>
+                <input type="text" name="goal-minutes" value="{{ goal_minutes|default_if_none:'' }}" size="4">
+                :
+                <input type="text" name="goal-seconds" value="{{ goal_seconds|default_if_none:'' }}" size="4">
+            </td>
+            <td>Your goal time in minutes and seconds e.g. 25:52</td>
         </tr>
     </table>
     <input type="submit" value="Save">

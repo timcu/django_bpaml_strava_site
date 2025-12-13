@@ -10,6 +10,7 @@ class User(AbstractUser):
     # null=True means field can be empty in database
     # blank=True means field can be empty in django forms
     parkrun_id = models.BigIntegerField(null=True, blank=True)
+    goal_duration = models.DurationField(default=None, null=True, blank=True)
 
     def __str__(self):
         return f"{self.email}<{self.first_name} {self.last_name}>"
