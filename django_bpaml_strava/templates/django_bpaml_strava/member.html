@@ -34,3 +34,12 @@
 <p>Please sign in to update member details</p>
 {% endif %}
 {% endblock %}
+{% block nav-breadcrumbs %}
+<nav aria-label="Breadcrumbs">
+  <div class="breadcrumbs">
+    <a href="{% url 'index' %}">Athletes</a>
+    &gt;
+    <a href="{% url 'member-edit' %}">Update member details</a>
+  </div>
+</nav>
+{% endblock %}
