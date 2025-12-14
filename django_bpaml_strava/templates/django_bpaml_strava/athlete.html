@@ -33,6 +33,7 @@
         <th>Strava duration</th>
         <th>Parkrun duration</th>
         <th>Parkrun location</th>
+        <th>Volunteer</th>
         <th>Action</th>
     </tr>
     {% for activity in athlete.user.activity_set.all %}
@@ -46,6 +47,7 @@
         <td>{% if activity.strava_duration %}{{ activity.strava_duration }}{% endif %}</td>
         <td>{{ activity.parkrun_duration }}</td>
         <td>{{ activity.location }}</td>
+        <td>{% if activity.volunteer_event %}<a href="{{activity.volunteer_url}}" target="_blank">{{activity.volunteer_event}}</a>{% endif %}</td>
         <td><a href="{% url 'delete-activity' athlete.uid activity.activity_id %}" title="does not delete from strava">delete</a></td>
     </tr>
     {% endfor %}
@@ -57,7 +59,12 @@
     {% if athlete.user.parkrun_id %}
       <a href="{% url 'save-parkruns' athlete.uid %}" title="from Parkrun for this athlete">fetch Parkrun results</a>
     {% else %}
-      <em title="edit member details and set Parkrun ID to be able to fetch Parkrun results">No Parkrun ID</em>
+      <em title="edit member details and set Parkrun ID to be able to fetch Parkrun results or claim volunteer">No Parkrun ID</em>
+    {% endif %}
+</p>
+<p>
+    {% if athlete.user.parkrun_id %}
+      <a href="{% url 'volunteer' athlete.uid %}" title="from Parkrun for this athlete">claim parkrun volunteer</a>
     {% endif %}
 </p>
 <p>

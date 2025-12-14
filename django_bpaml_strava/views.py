@@ -1,10 +1,12 @@
 import datetime
 import logging
+import re
+
 import requests
 import zoneinfo
 from allauth.socialaccount.models import SocialAccount
 from bs4 import BeautifulSoup
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, redirect
 from django.db.models import Prefetch
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -13,10 +15,19 @@ from django.urls import reverse
 
 from django_bpaml_strava.models import Activity
 from django_bpaml_strava.strava_token import fetch_strava_token
-from django_bpaml_strava.version import version
 
 logger = logging.getLogger(__name__)
 BASE_TZ = zoneinfo.ZoneInfo("Australia/Brisbane")
+# Headers required by parkrun to validate source
+HEADERS_PARKRUN = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1'
+}
+
 
 def index_page(request):
     """Find all athletes """
@@ -47,6 +58,10 @@ def social_account_with_sorted_activities(strava_id):
                           )
                         )
                       .first())
+    for a in social_account.user.activity_set.all():
+        if a.volunteer_event is not None:
+            location = re.sub(r'[^a-z]', '', a.location.lower())
+            a.volunteer_url = f"https://www.parkrun.com.au/{location}/results/{a.volunteer_event}/"
     return social_account
 
 
@@ -240,18 +255,9 @@ def fetch_and_save_parkruns(request, strava_id):
     parkrun_id = social_account.user.parkrun_id
     url = f"https://www.parkrun.com.au/parkrunner/{parkrun_id}/all/"
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
-    }
-
-    response = requests.get(url, headers=headers, timeout=10)
+    response = requests.get(url, headers=HEADERS_PARKRUN, timeout=10)
     try:
-        # fetch html from parkrun or raise timeout exception if no response
+        # fetch HTML from parkrun or raise timeout exception if no response
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'lxml')
     except requests.exceptions.Timeout:
@@ -375,3 +381,86 @@ def member(request):
             goal_seconds = int(request.user.goal_duration.total_seconds() % 60)
         context = {"goal_minutes": goal_minutes, "goal_seconds": goal_seconds}
         return render(request, "django_bpaml_strava/member.html", context=context)
+
+
+@login_required()
+def volunteer(request, strava_id):
+    """Update member details for currently logged-in user
+
+    First name
+    Last name
+    Parkrun ID
+    Goal Duration
+    """
+    social_account = social_account_with_sorted_activities(strava_id)
+    if request.method == "POST":
+        parkrun_id = str(social_account.user.parkrun_id)
+        location = request.POST.get("volunteer-location")
+        # Convert to lower case and remove all characters which are not letter of the alphabet
+        location = re.sub(r'[^a-z]', '', location.lower())
+        # If event number missing (empty str), check latest results
+        event = request.POST.get("volunteer-event") or "latestresults"
+        url = f"https://www.parkrun.com.au/{location}/results/{event}/"
+        logger.info(f"Volunteer {location=} {event=} {url=}")
+        response = requests.get(url, headers=HEADERS_PARKRUN, timeout=10)
+        try:
+            # fetch HTML from parkrun or raise timeout exception if no response
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, 'lxml')
+        except requests.exceptions.Timeout:
+            messages.error(request, "The request timed out. Please try again later.")
+            return redirect('view-activities', strava_id=strava_id)
+
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 404:
+                messages.error(request, f"{response.status_code} The requested page was not found. {url}")
+            elif response.status_code == 403:
+                messages.error(request, f"{response.status_code} Access to parkrun is forbidden.")
+            elif response.status_code >= 500:
+                messages.error(request, f"{response.status_code} The parkrun server is experiencing issues. Please try again later.")
+            else:
+                messages.error(request, f"{response.status_code} An error occurred: {e}")
+            return redirect('view-activities', strava_id=strava_id)
+
+        except requests.exceptions.ConnectionError:
+            messages.error(request, "Unable to connect to parkrun server. Please check your internet connection.")
+            return redirect('view-activities', strava_id=strava_id)
+
+        except requests.exceptions.RequestException as e:
+            messages.error(request, "An unexpected error occurred. Please try again.")
+            return redirect('view-activities', strava_id=strava_id)
+        print(soup)
+        # return redirect('view-activities', strava_id=strava_id)
+        div_content = soup.find("div", {"id": "content"})
+        p = div_content.find("div", {"class": "paddedt"}).p
+        volunteer_links = p.find_all("a", href=True)
+        volunteer_ids = [link["href"].split('/')[-1] for link in volunteer_links]
+        logger.info(f"{volunteer_ids=}")
+        if parkrun_id in volunteer_ids:
+            div_results_header = soup.find("div", {"class": "Results-header"})
+            location = div_results_header.find("h1").get_text().replace(" parkrun", "")
+            span_date = div_results_header.find("span", {"class": "format-date"})
+            parkrun_date = datetime.datetime.strptime(span_date.get_text(), "%d/%m/%Y").date()
+            span_event = div_results_header.find_all("span")[-1]
+            volunteer_event = int(span_event.get_text().replace("#", ""))
+            for a in social_account.user.activity_set.all():
+                if parkrun_date == a.date:
+                    a.location = location
+                    a.volunteer_event = volunteer_event
+                    a.save()
+                    break
+            else:
+                a = Activity.objects.create(
+                    athlete=social_account.user,
+                    activity_id=int(f"{parkrun_date:%Y%m%d}"),
+                    date=parkrun_date,
+                    volunteer_event=volunteer_event,
+                    location=location,
+                )
+                a.save()
+        else:
+            messages.warning(request, "You are not listed as a volunteer at that event.")
+        return redirect('view-activities', strava_id=strava_id)
+    else:
+        context = {"athlete": social_account}
+        return render(request, "django_bpaml_strava/volunteer.html", context=context)

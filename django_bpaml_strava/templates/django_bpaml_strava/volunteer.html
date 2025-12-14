@@ -1,0 +1,52 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% block main %}
+{% if user.is_authenticated %}
+<h2>Strava athlete</h2>
+<form action="{% url 'volunteer' athlete.uid %}" method="post">
+{% csrf_token %}
+    <table>
+        <tr>
+            <td>Email: </td>
+            <td>{{ athlete.user.email }}</td>
+        </tr>
+        <tr>
+            <td>Name:</td>
+            <td>{{ athlete.user.first_name }} {{ athlete.user.last_name }}</td>
+        </tr>
+        <tr>
+            <td>Parkrun ID:</td>
+            <td>A{{ athlete.user.parkrun_id }}</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Volunteer location:</td>
+            <td>
+                <input type="text" name="volunteer-location" value="" size="47">
+            </td>
+            <td>e.g. St Lucia, or stlucia, or newfarm or rocksriverside</td>
+        </tr>
+        <tr>
+            <td>Volunteer event number:</td>
+            <td>
+                <input type="text" name="volunteer-event" value="" size="47">
+            </td>
+            <td>e.g. 367 for St Lucia event 367 on 6-Dec-2025 on Leave blank for latest</td>
+        </tr>
+    </table>
+    <input type="submit" value="Save">
+</form>
+{% else %}
+<p>Please sign in and provide a parkrun ID to enter volunteer details</p>
+{% endif %}
+{% endblock %}
+{% block nav-breadcrumbs %}
+<nav aria-label="Breadcrumbs">
+  <div class="breadcrumbs">
+    <a href="{% url 'index' %}">Athletes</a>
+    &gt;
+    <a href="{% url 'athlete' athlete.uid %}">{{ athlete.user.first_name }} {{ athlete.user.last_name }}</a>
+    &gt;
+    <a href="{% url 'volunteer' athlete.uid %}" title="from Parkrun for this athlete">claim volunteer</a>
+  </div>
+</nav>
+{% endblock %}
