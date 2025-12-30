@@ -8,3 +8,22 @@
 .bpaml-content .bpaml-main {padding-left: 10px;}
 .bpaml-instructions {margin-top: 5em;}
 footer {padding-left: 10px;}
+
+/* stack the aside and content on mobile */
+@media (max-width: 768px) {
+  #content > .bpaml-content {
+    flex-direction: column;
+  }
+
+  #user-sidebar {
+    flex: 0 0 auto;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline-color);
+  }
+
+  .bpaml-content .bpaml-main {
+    padding-left: 0;
+    padding-top: 10px;
+  }
+}
