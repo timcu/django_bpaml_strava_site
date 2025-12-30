@@ -8,7 +8,8 @@ import zoneinfo
 from allauth.socialaccount.models import SocialAccount
 from bs4 import BeautifulSoup
 from django.shortcuts import render, redirect
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Count, Q
+from django.db.models.functions import Lower
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
@@ -32,12 +33,27 @@ HEADERS_PARKRUN = {
 
 def index_page(request):
     """Find all athletes """
-    list_social_accounts = SocialAccount.objects.filter(provider='strava').select_related('user')
+    list_social_accounts = SocialAccount.objects.filter(
+        provider='strava'
+    ).exclude(
+        user__last_name="DON'T USE"
+    ).select_related('user').prefetch_related('user__activity_set').annotate(
+        volunteered=Count('user__activity', filter=Q(user__activity__volunteer_event__isnull=False))
+    ).order_by(
+        Lower('user__last_name'), Lower('user__first_name')
+    )
     for sa in list_social_accounts:
         if sa.user == request.user or request.user.is_staff:
             sa.is_authenticated = request.user.is_authenticated
         else:
             sa.is_authenticated = False
+        fastest = None
+        for a in sa.user.activity_set.all():
+            if a.parkrun_duration and (fastest is None or a.parkrun_duration < fastest):
+                fastest = a.parkrun_duration
+            if a.strava_duration and (fastest is None or a.strava_duration < fastest):
+                fastest = a.strava_duration
+        sa.fastest = fastest
     context = {'athletes': list_social_accounts}
     return render(request, 'django_bpaml_strava/athletes.html', context)
 

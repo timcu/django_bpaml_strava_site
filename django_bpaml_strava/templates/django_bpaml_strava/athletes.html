@@ -9,7 +9,9 @@
         <th>Parkrun ID</th>
         {% endif %}
         <th>Activities</th>
+        <th>Volunteered</th>
         <th>Goal time</th>
+        <th>Fastest time</th>
         {% if user.is_authenticated %}
         <th>action</th>
         {% endif %}
@@ -22,7 +24,9 @@
             <td>{% if athlete.is_authenticated %}{{athlete.user.parkrun_id|default_if_none:''}}{% endif %}</td>
             {% endif %}
             <td>{{athlete.user.activity_set.count}}</td>
+            <td>{{ athlete.volunteered }}</td>
             <td>{{ athlete.user.goal_duration }}</td>
+            <td>{{ athlete.fastest }}</td>
             {% if user.is_authenticated %}
             <td>
                 {% if athlete.is_authenticated %}
