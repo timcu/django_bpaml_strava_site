@@ -343,7 +343,7 @@ def fetch_and_save_parkruns(request, strava_id):
         logger.info(f"Create {dct_parkrun['date']=} {dct_parkrun['location']}")
         a = Activity.objects.create(
             athlete=social_account.user,
-            activity_id=int(f"{dct_parkrun['date']:%Y%m%d}"),
+            activity_id=int(f"{parkrun_id}{dct_parkrun['date']:%Y%m%d}"),
             date=dct_parkrun["date"],
             parkrun_duration=dct_parkrun["parkrun_duration"],
             location=dct_parkrun["location"],
@@ -463,7 +463,7 @@ def volunteer(request, strava_id):
             else:
                 a = Activity.objects.create(
                     athlete=social_account.user,
-                    activity_id=int(f"{parkrun_date:%Y%m%d}"),
+                    activity_id=int(f"{parkrun_id}{parkrun_date:%Y%m%d}"),
                     date=parkrun_date,
                     volunteer_event=volunteer_event,
                     location=location,
