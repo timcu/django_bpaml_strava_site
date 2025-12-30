@@ -360,6 +360,20 @@ def delete_activities(request, strava_id):
     return redirect('view-activities', strava_id=strava_id)
 
 
+@login_required
+def delete_activities_admin(request):
+    if request.user.is_superuser:
+        list_social_accounts = SocialAccount.objects.filter(
+            provider='strava'
+        ).select_related('user').prefetch_related('user__activity_set')
+        for sa in list_social_accounts:
+            sa.user.activity_set.all().delete()
+        messages.info(request, "All users' activities deleted")
+    else:
+        messages.info(request, "Superuser access required to delete all users' activities")
+    return redirect('index')
+
+
 @login_required()
 def member(request):
     """Update member details for currently logged-in user
