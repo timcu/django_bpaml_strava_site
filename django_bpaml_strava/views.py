@@ -1,6 +1,7 @@
 import datetime
 import logging
 import re
+from zoneinfo import ZoneInfoNotFoundError
 
 import requests
 import zoneinfo
@@ -134,15 +135,14 @@ def fetch_and_view_activities(request, strava_id):
 
 def create_activity_from_strava(social_account: SocialAccount, dct_activity):
     """
-    Given the json data for a single activity from Strava (already converted to a dict)
+    Given the JSON data for a single activity from Strava (already converted to a dict)
     create an Activity record linked to the correct User and save in the database.
     Checks first if an activity exists for that date and modifies it if so.
     """
     # timezone looks like '(GMT+10:00) Australia/Brisbane'
-    list_timezone = dct_activity['timezone'].split(' ')
-    timezone = list_timezone[1]
-    start_time = datetime.datetime.strptime(dct_activity["start_date"], "%Y-%m-%dT%H:%M:%SZ").astimezone(zoneinfo.ZoneInfo(timezone))
-    start_time_local = datetime.datetime.strptime(dct_activity["start_date_local"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=zoneinfo.ZoneInfo(timezone))
+    zi = zi_from_strava_timezone(dct_activity["timezone"])
+    start_time = datetime.datetime.strptime(dct_activity["start_date"], "%Y-%m-%dT%H:%M:%SZ").astimezone(zi)
+    start_time_local = datetime.datetime.strptime(dct_activity["start_date_local"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=zi)
     start_date = start_time.date()
     logger.info(f'{start_time:%d-%b-%Y %H:%M} {start_time_local:%d-%b-%Y %H:%M %z} {dct_activity["distance"] / 1000:6.1f}km {dct_activity["name"]}')
     dct_activity_by_date = {a.date: a for a in social_account.user.activity_set.all()}
@@ -153,7 +153,7 @@ def create_activity_from_strava(social_account: SocialAccount, dct_activity):
         a.activity_id=dct_activity["id"]
         a.start_time=start_time
         a.start_time_local=start_time_local.replace(tzinfo=None)
-        a.timezone=timezone
+        a.timezone=str(zi)
         a.distance=dct_activity["distance"]
         a.title=dct_activity["name"]
         a.strava_duration=datetime.timedelta(seconds=dct_activity["elapsed_time"])
@@ -167,7 +167,7 @@ def create_activity_from_strava(social_account: SocialAccount, dct_activity):
             date=start_date,
             start_time=start_time,
             start_time_local=start_time_local.replace(tzinfo=None),
-            timezone=timezone,
+            timezone=str(zi),
             distance=dct_activity["distance"],
             title=dct_activity["name"],
             strava_duration=datetime.timedelta(seconds=dct_activity["elapsed_time"]),
@@ -231,14 +231,9 @@ def fetch_and_save_activities(request, strava_id):
     set_saturday = set(a.date for a in social_account.user.activity_set.all() if len(str(a.activity_id)) > 8)
     for dct_activity in lst_strava_activities:
         # timezone looks like '(GMT+10:00) Australia/Brisbane'
-        list_timezone = dct_activity['timezone'].split(' ')
-        timezone = list_timezone[1]
-        start_time = datetime.datetime.strptime(
-            dct_activity["start_date"],
-            "%Y-%m-%dT%H:%M:%SZ").astimezone(zoneinfo.ZoneInfo(timezone))
-        start_time_local = datetime.datetime.strptime(
-            dct_activity["start_date_local"],
-            "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=zoneinfo.ZoneInfo(timezone))
+        zi = zi_from_strava_timezone(dct_activity["timezone"])
+        start_time = datetime.datetime.strptime(dct_activity["start_date"],"%Y-%m-%dT%H:%M:%SZ").astimezone(zi)
+        start_time_local = datetime.datetime.strptime(dct_activity["start_date_local"],"%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=zi)
         start_date = start_time_local.date()
         latest_start_time = start_time.replace(hour=7, minute=10, second=0, microsecond=0)
         # Find last start on each Saturday before 7:10am local time that is between 4.7km and 5.3km
@@ -464,3 +459,25 @@ def volunteer(request, strava_id):
     else:
         context = {"athlete": social_account}
         return render(request, "django_bpaml_strava/volunteer.html", context=context)
+
+
+def zi_from_strava_timezone(strava_timezone) -> zoneinfo.ZoneInfo | datetime.timezone:
+    list_timezone = strava_timezone.split(' ')
+    timezone_name = list_timezone[1]
+    try:
+        return zoneinfo.ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        logger.warning(f"Timezone not found for {strava_timezone} in strava activity")
+        # Parse the offset from the string
+        match = re.search(r'GMT([+-])(\d+):(\d+)', list_timezone[0])
+        if match:
+            sign = 1 if match.group(1) == '+' else -1
+            hours = int(match.group(2))
+            minutes = int(match.group(3))
+            offset = datetime.timedelta(hours=sign * hours, minutes=sign * minutes)
+            logger.info(f"Using offset {offset}")
+            return datetime.timezone(offset)
+        else:
+            # Fallback to UTC if parsing fails
+            logger.warning("Using UTC")
+            return datetime.timezone.utc
