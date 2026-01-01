@@ -2,6 +2,7 @@ import datetime
 import logging
 import re
 from zoneinfo import ZoneInfoNotFoundError
+from itertools import combinations
 
 import requests
 import zoneinfo
@@ -14,6 +15,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+import plotly.graph_objects as go
+from scipy import stats
+import numpy as np
 
 from django_bpaml_strava.models import Activity
 from django_bpaml_strava.strava_token import fetch_strava_token
@@ -65,7 +69,7 @@ def athlete_page(request, strava_id):
     return render(request, 'django_bpaml_strava/athlete.html', context)
 
 
-def social_account_with_sorted_activities(strava_id):
+def social_account_with_sorted_activities(strava_id: str):
     social_account = (SocialAccount.objects.filter(uid=strava_id, provider='strava')
                       .select_related("user")
                       .prefetch_related(
@@ -511,3 +515,206 @@ def zi_from_strava_timezone(strava_timezone) -> zoneinfo.ZoneInfo | datetime.tim
             # Fallback to UTC if parsing fails
             logger.warning("Using UTC")
             return datetime.timezone.utc
+
+
+def min_sec(duration) -> str:
+    if not duration:
+        return "0:00"
+    if hasattr(duration, "total_seconds"):
+        total_seconds = int(duration.total_seconds())
+    else:
+        total_seconds = int(duration)
+    return f"{total_seconds // 60}:{total_seconds % 60:02d}"
+
+
+def view_athlete_activity_chart(request, strava_id):
+    # Get activities for the user
+    social_account = social_account_with_sorted_activities(strava_id=strava_id)
+
+    # Prepare data for the chart
+    dates = []
+    durations = []
+    labels = []
+    volunteer_dates = []
+    volunteer_locations = []
+    # If not enough datapoints for a line of best fit then plot on horizontal line through goal time
+    slope = 0
+    intercept = social_account.user.goal_duration.total_seconds()/60
+
+    for activity in social_account.user.activity_set.all():
+        # Get the fastest duration between the two fields
+        fastest = None
+        if activity.parkrun_duration and activity.strava_duration:
+            fastest = min(activity.parkrun_duration, activity.strava_duration)
+        elif activity.parkrun_duration:
+            fastest = activity.parkrun_duration
+        elif activity.strava_duration:
+            fastest = activity.strava_duration
+
+        if fastest is not None:
+            dates.append(activity.date)
+            total_seconds = int(fastest.total_seconds())
+            durations.append(total_seconds / 60)  # Convert to minutes
+            labels.append(min_sec(fastest))
+
+        if activity.volunteer_event is not None:
+            volunteer_dates.append(activity.date)
+            volunteer_locations.append(activity.location)
+
+    # Create the Plotly figure
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=dates,
+        y=durations,
+        mode='lines+markers+text',
+        name=f'{social_account.user.get_full_name()}',
+        text=labels,
+        textposition='top center',
+        textfont=dict(size=10),
+    ))
+
+    if len(dates) > 0 and social_account.user.goal_duration:
+        shortfall = int(max(0, min(durations)*60 - social_account.user.goal_duration.total_seconds()))
+        if len(dates) == 1:
+            # Single data point for goal time
+            fig.add_trace(go.Scatter(
+                x=[dates[0]],
+                y=[social_account.user.goal_duration.total_seconds() / 60] * 1,
+                mode='lines',
+                name=f'Goal {min_sec(social_account.user.goal_duration)} (shortfall={shortfall}s)',
+            ))
+        else:
+            # horizontal line for goal time
+            fig.add_trace(go.Scatter(
+                x=[dates[0], dates[-1]],
+                y=[social_account.user.goal_duration.total_seconds() / 60] * 2,
+                mode='lines',
+                name=f'Goal {min_sec(social_account.user.goal_duration)} (shortfall={shortfall}s)',
+            ))
+
+    logger.info(f"{len(dates)=}")
+    # Convert dates to numeric values (days since first date)
+    x_numeric = np.array([(d - dates[0]).days for d in dates])
+    y_numeric = np.array(durations)
+    if len(dates) > 8:
+        # Find best 8 results that show no increase in time over period
+
+        # Find the best 8 points
+        n_points = min(8, len(dates))
+        lowest_slowdown_indices = []
+        best_indices = None
+        lowest_slowdown = datetime.timedelta(seconds=60*60)
+
+        # Try all combinations of n_points to see which ones
+        for indices in combinations(range(len(dates)), n_points):
+            y_subset = y_numeric[list(indices)]
+
+            # Calculate climb in times with this set
+            y_prev = None
+            slowdown = 0
+            for i, y in enumerate(y_subset):
+                if y_prev is not None and y_prev < y:
+                    slowdown += y - y_prev
+                y_prev = y
+
+            if len(lowest_slowdown_indices) == 0 or slowdown < lowest_slowdown:
+                lowest_slowdown = slowdown
+                lowest_slowdown_indices = [indices]
+            elif slowdown == lowest_slowdown:
+                lowest_slowdown_indices.append(indices)
+
+        # There may be several with the same score so find which ones are straightest
+        best_r_squared = 0
+        for indices in lowest_slowdown_indices:
+            x_subset = x_numeric[list(indices)]
+            y_subset = y_numeric[list(indices)]
+
+            # Calculate R-squared for this subset
+            slope, intercept, r_value, _, _ = stats.linregress(x_subset, y_subset)
+            r_squared = r_value ** 2
+
+            if r_squared > best_r_squared:
+                best_r_squared = r_squared
+                best_indices = indices
+
+        # Calculate final regression with best points
+        x_best = x_numeric[list(best_indices)]
+        y_best = y_numeric[list(best_indices)]
+    else:
+        x_best = x_numeric
+        y_best = y_numeric
+        y_prev = None
+        best_indices = range(len(dates))  # all required because haven't exceeded 8 datapoints
+        # Calculate lowest_slowdown on all points since haven't exceeded 8 datapoints
+        lowest_slowdown = 0
+        for y in y_numeric:
+            if y_prev is not None and y_prev < y:
+                lowest_slowdown += y - y_prev
+            y_prev = y
+
+    if len(dates) > 1:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x_best, y_best)
+
+        # Create points for the line of best fit across entire date range
+        line_x = [dates[0], dates[-1]]
+        line_y = [intercept, slope * x_numeric[-1] + intercept]
+
+        # Add line of best fit
+        fig.add_trace(go.Scatter(
+            x=line_x,
+            y=line_y,
+            mode='lines',
+            name=f'Line of best fit (r={r_value:.3f}), {len(x_best)} best points',
+            line=dict(dash='dash', color='green')
+        ))
+        # Highlight the 8 points used
+        best_dates = [dates[i] for i in best_indices]
+        best_durations = [durations[i] for i in best_indices]
+        fig.add_trace(go.Scatter(
+            x=best_dates,
+            y=best_durations,
+            mode='markers',
+            name=f'Points used for fit (slowdown={int(lowest_slowdown*60+0.5)}s)',
+            marker=dict(size=12, color='green', symbol='circle-open', line=dict(width=2))
+        ))
+
+    if len(volunteer_locations) > 0:
+        # Highlight volunteered
+        volunteer_durations = [slope * (d - dates[0]).days + intercept for d in volunteer_dates]
+        fig.add_trace(go.Scatter(
+            x=volunteer_dates,
+            y=volunteer_durations,
+            text=volunteer_locations,
+            textposition='top center',
+            mode='markers+text',
+            name=f'Volunteered {len(volunteer_dates)} times',
+            marker=dict(size=12, line_color='midnightblue', color='lightskyblue', symbol='triangle-down-dot', line=dict(width=2))
+        ))
+
+    # Set up x-axis to show every Saturday
+    if dates:
+        first_date = dates[0]
+        fig.update_xaxes(
+            tick0=first_date,
+            dtick=7 * 24 * 60 * 60 * 1000,  # 7 days in milliseconds
+            tickformat='%Y-%m-%d',
+            tickangle=-45
+        )
+
+    fig.update_layout(
+        title=f'Activity times {social_account.user.get_full_name()}',
+        xaxis_title='Date',
+        yaxis_title='Parkrun time (minutes)',
+        hovermode='x unified',
+        width=1200,
+        height=600,
+    )
+
+    cdn = {'include_plotlyjs': 'cdn'}
+
+    context = {
+        'athlete': social_account,
+        'chart_htmls': [fig.to_html(config={"responsive": True}, full_html=False, default_width='100%', **cdn)]
+    }
+
+    return render(request, 'django_bpaml_strava/athlete_chart.html', context)

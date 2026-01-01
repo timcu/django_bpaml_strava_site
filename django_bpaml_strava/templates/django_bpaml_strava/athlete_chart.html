@@ -1,0 +1,24 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% load tz %}
+
+{% block main %}
+{% if user.is_authenticated %}
+<h2>Athlete Chart</h2>
+    {% for chart_html in chart_htmls %}
+    {{ chart_html | safe }}
+    {% endfor %}
+{% else %}
+<p>Please sign in to update member details</p>
+{% endif %}
+{% endblock %}
+{% block nav-breadcrumbs %}
+<nav aria-label="Breadcrumbs">
+  <div class="breadcrumbs">
+    <a href="{% url 'index' %}">Athletes</a>
+    &gt;
+    <a href="{% url 'view-activities' athlete.uid %}">{{ athlete.user.first_name }} {{ athlete.user.last_name }}</a>
+    &gt;
+    <a href="{% url 'view-athlete-chart' athlete.uid %}">chart</a>
+  </div>
+</nav>
+{% endblock %}

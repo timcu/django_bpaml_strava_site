@@ -68,6 +68,9 @@
     {% endif %}
 </p>
 <p>
+    <a href="{% url 'view-athlete-chart' athlete.uid %}">chart</a>
+</p>
+<p>
     <a href="{% url 'delete-activities' athlete.uid %}" title="only deletes activities for this athlete from local database. does not delete from strava">delete saved activities</a> (does not delete from strava)
 </p>
 {% if list_strava_activities %}
