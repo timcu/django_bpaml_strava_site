@@ -2,9 +2,10 @@ from django.urls import path
 from django_bpaml_strava.views import index_page, athlete_page, view_activities, view_athlete_activity_chart
 from django_bpaml_strava.views import fetch_and_view_activities, save_activity
 from django_bpaml_strava.views import delete_activity
-from django_bpaml_strava.views import fetch_and_save_activities, fetch_and_save_parkruns
+from django_bpaml_strava.views import fetch_and_save_activities, fetch_and_save_activities_all
+from django_bpaml_strava.views import fetch_and_save_parkruns_all, fetch_and_save_parkruns
 from django_bpaml_strava.views import delete_activities
-from django_bpaml_strava.views import delete_activities_admin
+from django_bpaml_strava.views import delete_activities_all
 from django_bpaml_strava.views import member
 from django_bpaml_strava.views import volunteer
 
@@ -17,9 +18,11 @@ urlpatterns = [
   path('save-activity/athlete/<int:strava_id>/activity/<int:activity_id>', save_activity, name='save-activity'),
   path('delete-activity/athlete/<int:strava_id>/activity/<int:activity_id>', delete_activity, name='delete-activity'),
   path('save-activities/athlete/<int:strava_id>', fetch_and_save_activities, name='save-activities'),
+  path('save-activities-all', fetch_and_save_activities_all, name='save-activities-all'),
   path('save-parkruns/athlete/<int:strava_id>', fetch_and_save_parkruns, name='save-parkruns'),
+  path('save-parkruns-all', fetch_and_save_parkruns_all, name='save-parkruns-all'),
   path('delete-activities/athlete/<int:strava_id>', delete_activities, name='delete-activities'),
-  path('delete-activities-all', delete_activities_admin, name='delete-activities-all'),
+  path('delete-activities-all', delete_activities_all, name='delete-activities-all'),
   path('member-edit/', member, name='member-edit'),
   path('volunteer/<int:strava_id>', volunteer, name='volunteer'),
 ]

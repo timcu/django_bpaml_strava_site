@@ -13,9 +13,10 @@ from django.db.models import Prefetch, Count, Q
 from django.db.models.functions import Lower
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponsePermanentRedirect
 from django.urls import reverse
 import plotly.graph_objects as go
+from requests import HTTPError
 from scipy import stats
 import numpy as np
 
@@ -35,9 +36,8 @@ HEADERS_PARKRUN = {
 }
 
 
-def index_page(request):
-    """Find all athletes """
-    list_social_accounts = SocialAccount.objects.filter(
+def list_active_strava_accounts():
+    return SocialAccount.objects.filter(
         provider='strava'
     ).exclude(
         user__last_name="DON'T USE"
@@ -46,6 +46,11 @@ def index_page(request):
     ).order_by(
         Lower('user__last_name'), Lower('user__first_name')
     )
+
+
+def index_page(request):
+    """Find all athletes """
+    list_social_accounts = list_active_strava_accounts()
     for sa in list_social_accounts:
         if sa.user == request.user or request.user.is_staff:
             sa.is_authenticated = request.user.is_authenticated
@@ -240,16 +245,10 @@ def delete_activity(request, strava_id, activity_id):
     return redirect('view-activities', strava_id=strava_id)
 
 
-@login_required
-def fetch_and_save_activities(request, strava_id):
-    """Fetch activities from strava, filter out non-parkrun events and save the rest if nothing else
-    already saved for that date"""
-    lst_strava_activities = fetch_activities_from_strava(strava_id)
-    if lst_strava_activities is None:
-        return index_page(request)
+def save_activities(strava_id, list_strava_activities):
     social_account = social_account_with_sorted_activities(strava_id)
     set_saturday = set(a.date for a in social_account.user.activity_set.all() if len(str(a.activity_id)) > 8)
-    for dct_activity in lst_strava_activities:
+    for dct_activity in list_strava_activities:
         # timezone looks like '(GMT+10:00) Australia/Brisbane'
         zi = zi_from_strava_timezone(dct_activity["timezone"])
         start_time = datetime.datetime.strptime(dct_activity["start_date"],"%Y-%m-%dT%H:%M:%SZ").astimezone(zi)
@@ -260,14 +259,41 @@ def fetch_and_save_activities(request, strava_id):
         if start_date not in set_saturday and start_time.weekday() == 5 and start_time < latest_start_time and 4700 < dct_activity["distance"] < 5300:
             create_activity_from_strava(social_account, dct_activity)
             set_saturday.add(start_date)
+
+
+@login_required
+def fetch_and_save_activities(request, strava_id):
+    """Fetch activities from strava, filter out non-parkrun events and save the rest if nothing else
+    already saved for that date"""
+    lst_strava_activities = fetch_activities_from_strava(strava_id)
+    if lst_strava_activities is None:
+        return index_page(request)
+    save_activities(strava_id, lst_strava_activities)
     return redirect('view-activities', strava_id=strava_id)
 
 
 @login_required
-def fetch_and_save_parkruns(request, strava_id):
+def fetch_and_save_activities_all(request):
+    """Fetch activities from strava, filter out non-parkrun events and save the rest if nothing else
+    already saved for that date for all users. Requires admin access"""
+    if request.user.is_superuser:
+        list_social_accounts = list_active_strava_accounts()
+        for sa in list_social_accounts:
+            list_strava_activities = fetch_activities_from_strava(sa.uid)
+            if list_strava_activities:
+                save_activities(sa.uid, list_strava_activities)
+        messages.info(request, "All users' activities fetched")
+    else:
+        messages.info(request, "Superuser access required to fetch all users' activities")
+    return redirect('index')
+
+
+def fetch_parkruns(request, social_account):
     """Fetch all the parkrun results for a user in first three months of current year without saving them"""
-    social_account = social_account_with_sorted_activities(strava_id)
     parkrun_id = social_account.user.parkrun_id
+    if parkrun_id is None:
+        messages.error(request, f"Parkrun id not found for user {social_account.user.get_full_name()}")
+        raise TypeError(f"Parkrun id not found for user {social_account.user.get_full_name()}")
     url = f"https://www.parkrun.com.au/parkrunner/{parkrun_id}/all/"
 
     response = requests.get(url, headers=HEADERS_PARKRUN, timeout=10)
@@ -277,26 +303,26 @@ def fetch_and_save_parkruns(request, strava_id):
         soup = BeautifulSoup(response.content, 'lxml')
     except requests.exceptions.Timeout:
         messages.error(request, "The request timed out. Please try again later.")
-        return redirect('view-activities', strava_id=strava_id)
+        raise
 
     except requests.exceptions.HTTPError as e:
         if response.status_code == 404:
-            messages.error(request, f"{response.status_code} The requested page was not found.")
+            messages.error(request, f"{response.status_code} The requested page was not found. {url}")
         elif response.status_code == 403:
-            messages.error(request, f"{response.status_code} Access to this resource is forbidden.")
+            messages.error(request, f"{response.status_code} Access to this resource is forbidden. {url}")
         elif response.status_code >= 500:
-            messages.error(request, f"{response.status_code} The server is experiencing issues. Please try again later.")
+            messages.error(request, f"{response.status_code} The server is experiencing issues. Please try again later. {url}")
         else:
-            messages.error(request, f"{response.status_code} An error occurred: {e}")
-        return redirect('view-activities', strava_id=strava_id)
+            messages.error(request, f"{response.status_code} An error occurred: {url} {e}")
+        raise
 
     except requests.exceptions.ConnectionError:
         messages.error(request, "Unable to connect to the server. Please check your internet connection.")
-        return redirect('view-activities', strava_id=strava_id)
+        raise
 
     except requests.exceptions.RequestException as e:
         messages.error(request, "An unexpected error occurred. Please try again.")
-        return redirect('view-activities', strava_id=strava_id)
+        raise
 
     year = datetime.datetime.now(BASE_TZ).year
     after = datetime.date(year, 1, 1)
@@ -310,7 +336,7 @@ def fetch_and_save_parkruns(request, strava_id):
             break
     else:
         messages.info(request, "No parkrun results found")
-        return redirect('view-activities', strava_id=strava_id)
+        raise ValueError("No parkrun results found in html")
 
     trs = t.tbody.find_all("tr")
     messages.info(request, f"Found {len(trs)} parkrun results")
@@ -334,27 +360,65 @@ def fetch_and_save_parkruns(request, strava_id):
             logger.info(f"Save dict {dct_parkrun=}")
         else:
             logger.debug(f"Reject Location: {tds[0].get_text()}, Date: {parkrun_date}, Time: {tds[4].get_text()} {before<=parkrun_date=} {after>parkrun_date=}")
+    return dct_parkruns_by_date
 
-    social_account = social_account_with_sorted_activities(strava_id)
-    for a in social_account.user.activity_set.all():
-        if a.date in dct_parkruns_by_date:
-            dct_parkrun = dct_parkruns_by_date.pop(a.date)
-            logger.info(f"Link {dct_parkrun['date']=} {dct_parkrun['location']} to {a.date=} ")
-            a.location = dct_parkrun["location"]
-            a.parkrun_duration = dct_parkrun["parkrun_duration"]
-            a.save()
-    for dct_parkrun in dct_parkruns_by_date.values():
+
+def create_activity_from_parkrun(social_account: SocialAccount, dct_parkrun):
+    """
+    Given the JSON data for a single activity from Strava (already converted to a dict)
+    create an Activity record linked to the correct User and save in the database.
+    Checks first if an activity exists for that date and modifies it if so.
+    """
+    dct_activity_by_date = {a.date: a for a in social_account.user.activity_set.all()}
+    if dct_parkrun["date"] in dct_activity_by_date:
+        a = dct_activity_by_date[dct_parkrun["date"]]
+        logger.info(f"Link {dct_parkrun['date']=} {dct_parkrun['location']} to {a.date=} ")
+        a.location = dct_parkrun["location"]
+        a.parkrun_duration = dct_parkrun["parkrun_duration"]
+    else:
         logger.info(f"Create {dct_parkrun['date']=} {dct_parkrun['location']}")
         a = Activity.objects.create(
             athlete=social_account.user,
-            activity_id=int(f"{parkrun_id}{dct_parkrun['date']:%Y%m%d}"),
+            activity_id=int(f"{social_account.user.parkrun_id}{dct_parkrun['date']:%Y%m%d}"),
             date=dct_parkrun["date"],
             parkrun_duration=dct_parkrun["parkrun_duration"],
             location=dct_parkrun["location"],
             distance=5000,
         )
-        a.save()
+    a.save()
+    return a
+
+
+@login_required
+def fetch_and_save_parkruns(request, strava_id):
+    """Fetch all the parkrun results for a user in first three months of current year and save them"""
+    social_account = social_account_with_sorted_activities(strava_id)
+    try:
+        dct_parkruns_by_date = fetch_parkruns(request, social_account)
+    except (TypeError, requests.exceptions.Timeout, HTTPError, requests.exceptions.ConnectionError, requests.exceptions.RequestException):
+        return redirect('view-activities', strava_id=strava_id)
+    for dct_parkrun in dct_parkruns_by_date.values():
+        create_activity_from_parkrun(social_account, dct_parkrun)
     return redirect('view-activities', strava_id=strava_id)
+
+
+@login_required
+def fetch_and_save_parkruns_all(request):
+    """Delete activities for all users - requires admin access"""
+    if request.user.is_superuser:
+        list_social_accounts = list_active_strava_accounts()
+        for sa in list_social_accounts:
+            try:
+                dct_parkruns_by_date = fetch_parkruns(request, sa)
+                for dct_parkrun in dct_parkruns_by_date.values():
+                    create_activity_from_parkrun(sa, dct_parkrun)
+            except (TypeError, requests.exceptions.Timeout, HTTPError, requests.exceptions.ConnectionError,
+                    requests.exceptions.RequestException):
+                pass
+        messages.info(request, "All users' parkruns fetched and saved")
+    else:
+        messages.info(request, "Superuser access required to fetch all users' parkruns")
+    return redirect('index')
 
 
 @login_required
@@ -365,7 +429,8 @@ def delete_activities(request, strava_id):
 
 
 @login_required
-def delete_activities_admin(request):
+def delete_activities_all(request):
+    """Delete activities for all users - requires admin access"""
     if request.user.is_superuser:
         list_social_accounts = SocialAccount.objects.filter(
             provider='strava'
