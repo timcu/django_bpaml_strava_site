@@ -9,8 +9,8 @@
 .bpaml-instructions {margin-top: 5em;}
 footer {padding-left: 10px;}
 
-/* stack the aside and content on mobile */
-@media (max-width: 768px) {
+/* stack the aside and content on mobile. On large screens they are beside each other */
+@media (max-width: 1200px) {
   #content > .bpaml-content {
     flex-direction: column;
   }
