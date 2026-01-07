@@ -36,7 +36,7 @@ classifiers =[
     "Operating System :: OS Independent",
     "Environment :: Web Environment",
     "Framework :: Django",
-    "Framework :: Django :: 5.2.8",
+    "Framework :: Django :: 5.2.9",
     "Intended Audience :: Developers",
     "Natural Language :: English",
     "Topic :: Internet :: WWW/HTTP",
@@ -55,4 +55,4 @@ build-backend = 'setuptools.build_meta'
 version_file = "django_bpaml_strava/_version.py"
 
 [tool.setuptools.packages.find]
-include = ["django_bpaml_strava*"]
+include = ["django_bpaml_strava"]
