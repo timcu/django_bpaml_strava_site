@@ -8,7 +8,7 @@
     {{ chart_html | safe }}
     {% endfor %}
 {% else %}
-<p>Please sign in to update member details</p>
+<p>Please sign in to view charts</p>
 {% endif %}
 {% endblock %}
 {% block nav-breadcrumbs %}
@@ -22,3 +22,4 @@
   </div>
 </nav>
 {% endblock %}
+{% block aside %}{% endblock %}
