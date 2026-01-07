@@ -8,12 +8,14 @@ from django_bpaml_strava.views import delete_activities
 from django_bpaml_strava.views import delete_activities_all
 from django_bpaml_strava.views import member
 from django_bpaml_strava.views import volunteer
+from django_bpaml_strava.views import view_athlete_activity_map
 
 urlpatterns = [
   path('', index_page, name='index'),
   path('athlete/<str:strava_id>/', athlete_page, name='athlete'),
   path('view-activities/athlete/<int:strava_id>', view_activities, name='view-activities'),
   path('view-chart/athlete/<int:strava_id>', view_athlete_activity_chart, name='view-athlete-chart'),
+  path('view-map/athlete/<int:strava_id>/activity/<int:activity_id>', view_athlete_activity_map, name='view-activity-map'),
   path('view-unsaved-activities-available-on-strava/athlete/<int:strava_id>', fetch_and_view_activities, name='view-unsaved-activities-available-on-strava'),
   path('save-activity/athlete/<int:strava_id>/activity/<int:activity_id>', save_activity, name='save-activity'),
   path('delete-activity/athlete/<int:strava_id>/activity/<int:activity_id>', delete_activity, name='delete-activity'),

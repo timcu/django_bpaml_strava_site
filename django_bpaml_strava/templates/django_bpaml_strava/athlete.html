@@ -48,7 +48,19 @@
         <td>{{ activity.parkrun_duration }}</td>
         <td>{{ activity.location }}</td>
         <td>{% if activity.volunteer_event %}<a href="{{activity.volunteer_url}}" target="_blank">{{activity.volunteer_event}}</a>{% endif %}</td>
-        <td><a href="{% url 'delete-activity' athlete.uid activity.activity_id %}" title="does not delete from strava">delete</a></td>
+        <td>
+            {% if activity.polyline %}
+            <a href="{% url 'view-activity-map' athlete.uid activity.activity_id %}" title="plot track on OpenStreetMap">map</a>
+            {% else %}
+            {% if activity.duration_strava %}
+                <span title="Can't plot map because missing polyline">no polyline</span>
+            {% else %}
+                <span title="Can't plot map because missing Strava with distance 4.7-5.3km starting before 7:10am">no Strava</span>
+            {% endif %}
+            {% endif %}
+            |
+            <a href="{% url 'delete-activity' athlete.uid activity.activity_id %}" title="does not delete from strava">delete</a>
+        </td>
     </tr>
     {% endfor %}
 </table>

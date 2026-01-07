@@ -13,8 +13,10 @@ from django.db.models import Prefetch, Count, Q
 from django.db.models.functions import Lower
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseRedirect, HttpResponsePermanentRedirect
+from django.http import HttpResponseRedirect, Http404
 from django.urls import reverse
+import folium
+import polyline
 import plotly.graph_objects as go
 from requests import HTTPError
 from scipy import stats
@@ -592,6 +594,7 @@ def min_sec(duration) -> str:
     return f"{total_seconds // 60}:{total_seconds % 60:02d}"
 
 
+@login_required()
 def view_athlete_activity_chart(request, strava_id):
     # Get activities for the user
     social_account = social_account_with_sorted_activities(strava_id=strava_id)
@@ -783,3 +786,47 @@ def view_athlete_activity_chart(request, strava_id):
     }
 
     return render(request, 'django_bpaml_strava/athlete_chart.html', context)
+
+
+@login_required()
+def view_athlete_activity_map(request, strava_id, activity_id):
+    # Get activities for the user
+    social_account = social_account_with_sorted_activities(strava_id=strava_id)
+    for activity in social_account.user.activity_set.all():
+        if activity.activity_id == activity_id:
+            break
+    else:
+        raise Http404()
+
+    figure = folium.Figure()
+    if activity.polyline:
+        # Decode the polyline
+        decoded_coords = polyline.decode(activity.polyline)
+        # Create a map centered around the center of the polyline
+        if decoded_coords:
+            max_lat = max(decoded_coords, key=lambda x: x[0])[0]
+            min_lat = min(decoded_coords, key=lambda x: x[0])[0]
+            max_lon = max(decoded_coords, key=lambda x: x[1])[1]
+            min_lon = min(decoded_coords, key=lambda x: x[1])[1]
+            map_center = (max_lat + min_lat) / 2, (max_lon + min_lon) / 2
+
+            m = folium.Map(location=[map_center[0], map_center[1]],
+                           width=1200, height=600,
+                           zoom_start=15, tiles="OpenStreetMap"
+                           )
+            # Add the polyline to the map
+            folium.PolyLine(decoded_coords, color="blue", weight=2.5, opacity=1).add_to(m)
+
+            m.add_to(figure)
+
+    # Render and send to template
+    figure.render()
+
+
+    context = {
+        'athlete': social_account,
+        'activity': activity,
+        'map': figure,
+    }
+
+    return render(request, 'django_bpaml_strava/athlete_map.html', context)

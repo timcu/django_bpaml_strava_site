@@ -1,0 +1,28 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% load tz %}
+{% block extrahead %}
+    {{ map.header.render | safe }}
+{% endblock %}
+{% block main %}
+{% if user.is_authenticated %}
+<h2>Athlete Map</h2>
+{{ map.html.render | safe }}
+<script>
+    {{ map.script.render | safe }}
+</script>
+{% else %}
+<p>Please sign in to view maps</p>
+{% endif %}
+{% endblock %}
+{% block nav-breadcrumbs %}
+<nav aria-label="Breadcrumbs">
+  <div class="breadcrumbs">
+    <a href="{% url 'index' %}">Athletes</a>
+    &gt;
+    <a href="{% url 'view-activities' athlete.uid %}">{{ athlete.user.first_name }} {{ athlete.user.last_name }}</a>
+    &gt;
+    <a href="{% url 'view-activity-map' athlete.uid activity.activity_id %}">map {{activity.date|date:"D d M Y"}}</a>
+  </div>
+</nav>
+{% endblock %}
+{% block aside %}{% endblock %}
