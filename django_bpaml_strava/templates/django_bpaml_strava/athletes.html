@@ -7,6 +7,8 @@
         {% if user.is_authenticated %}
         <th>Strava ID</th>
         <th>Parkrun ID</th>
+        <th>Latest Strava</th>
+        <th>Latest Parkrun</th>
         {% endif %}
         <th>Activities</th>
         <th>Volunteered</th>
@@ -20,8 +22,10 @@
         <tr>
             <td>{{athlete.user.first_name}} {{athlete.user.last_name}}</td>
             {% if user.is_authenticated %}
-            <td>{% if athlete.is_authenticated %}{{athlete.uid}}{% endif %}</td>
-            <td>{% if athlete.is_authenticated %}{{athlete.user.parkrun_id|default_if_none:''}}{% endif %}</td>
+            <td>{{athlete.uid}}</td>
+            <td>{{athlete.user.parkrun_id|default_if_none:''}}</td>
+            <td>{% if athlete.latest_strava %}{{athlete.latest_strava|date:"d M"}}{% endif %}</td>
+            <td>{% if athlete.latest_parkrun %}{{athlete.latest_parkrun|date:"d M"}}{% endif %}</td>
             {% endif %}
             <td>{{athlete.user.activity_set.count}}</td>
             <td>{{ athlete.volunteered }}</td>

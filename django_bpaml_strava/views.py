@@ -59,11 +59,23 @@ def index_page(request):
         else:
             sa.is_authenticated = False
         fastest = None
+        sa.num_strava = 0
+        sa.num_parkrun = 0
+        sa.latest_strava = None
+        sa.latest_parkrun = None
         for a in sa.user.activity_set.all():
-            if a.parkrun_duration and (fastest is None or a.parkrun_duration < fastest):
-                fastest = a.parkrun_duration
-            if a.strava_duration and (fastest is None or a.strava_duration < fastest):
-                fastest = a.strava_duration
+            if a.parkrun_duration:
+                sa.num_parkrun += 1
+                if sa.latest_parkrun is None or a.date > sa.latest_parkrun:
+                    sa.latest_parkrun = a.date
+                if fastest is None or a.parkrun_duration < fastest:
+                   fastest = a.parkrun_duration
+            if a.strava_duration:
+                sa.num_strava += 1
+                if sa.latest_strava is None or a.date > sa.latest_strava:
+                    sa.latest_strava = a.date
+                if fastest is None or a.strava_duration < fastest:
+                   fastest = a.strava_duration
         sa.fastest = fastest
     context = {'athletes': list_social_accounts}
     return render(request, 'django_bpaml_strava/athletes.html', context)
@@ -322,7 +334,7 @@ def fetch_parkruns(request, social_account):
         messages.error(request, "Unable to connect to the server. Please check your internet connection.")
         raise
 
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         messages.error(request, "An unexpected error occurred. Please try again.")
         raise
 
@@ -522,7 +534,7 @@ def volunteer(request, strava_id):
             messages.error(request, "Unable to connect to parkrun server. Please check your internet connection.")
             return redirect('view-activities', strava_id=strava_id)
 
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             messages.error(request, "An unexpected error occurred. Please try again.")
             return redirect('view-activities', strava_id=strava_id)
         print(soup)
