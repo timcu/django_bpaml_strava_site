@@ -9,6 +9,7 @@ from django_bpaml_strava.views import delete_activities_all
 from django_bpaml_strava.views import member
 from django_bpaml_strava.views import volunteer
 from django_bpaml_strava.views import view_athlete_activity_map
+from django_bpaml_strava.views import calculate_deviation
 
 urlpatterns = [
   path('', index_page, name='index'),
@@ -27,4 +28,5 @@ urlpatterns = [
   path('delete-activities-all', delete_activities_all, name='delete-activities-all'),
   path('member-edit/', member, name='member-edit'),
   path('volunteer/<int:strava_id>', volunteer, name='volunteer'),
+  path('calculate-deviation/<int:strava_id>', calculate_deviation, name='calculate-deviation'),
 ]

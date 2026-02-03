@@ -1,6 +1,8 @@
 import datetime
+import json
 import logging
 import re
+import statistics
 from zoneinfo import ZoneInfoNotFoundError
 from itertools import combinations
 
@@ -102,6 +104,17 @@ def social_account_with_sorted_activities(strava_id: str):
         if a.volunteer_event is not None:
             location = re.sub(r'[^a-z]', '', a.location.lower())
             a.volunteer_url = f"https://www.parkrun.com.au/{location}/results/{a.volunteer_event}/"
+        lst_pace = []
+        if a.strava_json is not None:
+            a.strava_activity = json.loads(a.strava_json)
+            for i, split in enumerate(a.strava_activity.get('splits_metric', [])):
+                speed = split.get('average_speed', 0.1)
+                if speed and i < 5:
+                    lst_pace.append(1000/speed)
+            if len(lst_pace) > 1:
+                std_deviation = statistics.stdev(lst_pace)
+                lst_pace_formatted = [min_sec(p) for p in lst_pace]
+                a.html_deviation = "<div>" + ", ".join(lst_pace_formatted) + f"<br>std dev {min_sec(std_deviation)}</div>"
     return social_account
 
 
@@ -139,10 +152,6 @@ def fetch_activities_from_strava(strava_id):
     # Check if the request was successful
     if response.ok:
         activity_data = response.json()
-        for a in activity_data:
-            if 'start_date_local' in a:
-                a['start_time_local'] = datetime.datetime.strptime(a["start_date_local"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=None)
-                logger.debug(f"{a['start_date_local']=} on {a['start_time_local']=}")
         logger.info(f"Athlete activities for authorized user: {len(activity_data)}")
         return activity_data
     else:
@@ -162,11 +171,12 @@ def fetch_and_view_activities(request, strava_id):
     social_account = social_account_with_sorted_activities(strava_id)
     # omit the ones already saved
     set_activity_id = set(a.activity_id for a in social_account.user.activity_set.all())
-    logger.info(f"{set_activity_id=}")
-    for i in range(len(list_strava_activities)-1, 0, -1):
-        if list_strava_activities[i]['id'] in set_activity_id:
-            del list_strava_activities[i]
     list_new_strava_activities = [d for d in list_strava_activities if d['id'] not in set_activity_id]
+    for a in list_new_strava_activities:
+        if 'start_date_local' in a:
+            a['start_time_local'] = datetime.datetime.strptime(a["start_date_local"], "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=None)
+            logger.debug(f"{a['start_date_local']=} on {a['start_time_local']=}")
     # display the results
     context = {'athlete': social_account, 'list_strava_activities': list_new_strava_activities}
     return render(request, 'django_bpaml_strava/athlete.html', context)
@@ -185,6 +195,15 @@ def create_activity_from_strava(social_account: SocialAccount, dct_activity):
     start_date = start_time.date()
     logger.info(f'{start_time:%d-%b-%Y %H:%M} {start_time_local:%d-%b-%Y %H:%M %z} {dct_activity["distance"] / 1000:6.1f}km {dct_activity["name"]}')
     dct_activity_by_date = {a.date: a for a in social_account.user.activity_set.all()}
+    if 'splits_metric' in dct_activity:
+        try:
+            strava_json = json.dumps(dct_activity)
+        except TypeError:
+            # probably caused by datetime in dct_activity
+            logger.warning(f"Could not serialize activity json for {dct_activity}")
+            strava_json = None
+    else:
+        strava_json = None
     if start_date in dct_activity_by_date:
         logger.info("updating existing activity")
         a = dct_activity_by_date[start_date]
@@ -198,6 +217,8 @@ def create_activity_from_strava(social_account: SocialAccount, dct_activity):
         a.strava_duration=datetime.timedelta(seconds=dct_activity["elapsed_time"])
         a.polyline=dct_activity["map"]["summary_polyline"]
         a.device_name=dct_activity.get("device_name", "no device")
+        if strava_json is not None:
+            a.strava_json=strava_json
     else:
         logger.info("creating new activity")
         a = Activity.objects.create(
@@ -212,13 +233,13 @@ def create_activity_from_strava(social_account: SocialAccount, dct_activity):
             strava_duration=datetime.timedelta(seconds=dct_activity["elapsed_time"]),
             polyline=dct_activity["map"]["summary_polyline"],
             device_name=dct_activity.get("device_name", "no device"),
+            strava_json=strava_json,
         )
     a.save()
     return a
 
 
-@login_required
-def save_activity(request, strava_id, activity_id):
+def save_activity_from_id(strava_id, activity_id):
     social_account: SocialAccount = social_account_with_sorted_activities(strava_id)
     social_token = fetch_strava_token(strava_id)
     # Define the endpoint and headers to fetch a single activity
@@ -227,7 +248,7 @@ def save_activity(request, strava_id, activity_id):
 
     # Define parameters for the request. We don't need all efforts for this activity
     params = {
-        'include_all_efforts': False,
+        'include_all_efforts': True,
     }
 
     # Make the GET request with parameters for single activity
@@ -241,6 +262,12 @@ def save_activity(request, strava_id, activity_id):
         create_activity_from_strava(social_account, dct_activity)
     else:
         logger.warning(f"Error requesting activities from strava {response.status_code}: {response.text}")
+    return
+
+
+@login_required
+def save_activity(request, strava_id, activity_id):
+    save_activity_from_id(strava_id, activity_id)
     # requery db to include new activity
     return redirect("view-activities", strava_id=strava_id)
 
@@ -833,12 +860,19 @@ def view_athlete_activity_map(request, strava_id, activity_id):
 
     # Render and send to template
     figure.render()
-
-
     context = {
         'athlete': social_account,
         'activity': activity,
         'map': figure,
     }
-
     return render(request, 'django_bpaml_strava/athlete_map.html', context)
+
+
+@login_required
+def calculate_deviation(request, strava_id):
+    """Fetch full activity for every strava activity for this strava id so that splits and standard deviations can be calculated"""
+    social_account = social_account_with_sorted_activities(strava_id)
+    for activity in social_account.user.activity_set.all():
+        if activity.strava_duration and activity.activity_id and activity.strava_json is None:
+            save_activity_from_id(strava_id, activity.activity_id)
+    return redirect("view-activities", strava_id=strava_id)

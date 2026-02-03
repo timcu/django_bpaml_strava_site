@@ -32,6 +32,7 @@ class Activity(models.Model):
     polyline = models.CharField(max_length=4000)
     volunteer_event = models.BigIntegerField("Event number volunteered at that parkrun location", null=True, blank=True)
     device_name = models.CharField(max_length=200, null=True, blank=True)
+    strava_json = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.title

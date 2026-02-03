@@ -35,6 +35,9 @@
         <th>Parkrun location</th>
         <th>Volunteer</th>
         <th>Action</th>
+        {% if user.is_superuser %}
+            <th title="superuser only">Deviation</th>
+        {% endif %}
     </tr>
     {% for activity in athlete.user.activity_set.all %}
     <tr>
@@ -61,6 +64,9 @@
             |
             <a href="{% url 'delete-activity' athlete.uid activity.activity_id %}" title="does not delete from strava">delete</a>
         </td>
+        {% if user.is_superuser %}
+            <td>{{ activity.html_deviation|safe }}</td>
+        {% endif %}
     </tr>
     {% endfor %}
 </table>
@@ -82,6 +88,11 @@
 <p>
     <a href="{% url 'view-athlete-chart' athlete.uid %}">chart</a>
 </p>
+{% if user.is_superuser %}
+<p>
+    <a href="{% url 'calculate-deviation' athlete.uid %}" title="fetch splits from strava for all saved activities and calculate standard deviations">calculate deviations</a>
+</p>
+{% endif %}
 <p>
     <a href="{% url 'delete-activities' athlete.uid %}" title="only deletes activities for this athlete from local database. does not delete from strava">delete saved activities</a> (does not delete from strava)
 </p>
