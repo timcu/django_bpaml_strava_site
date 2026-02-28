@@ -567,15 +567,15 @@ def volunteer(request, strava_id):
         print(soup)
         # return redirect('view-activities', strava_id=strava_id)
         div_content = soup.find("div", {"id": "content"})
-        p = div_content.find("div", {"class": "paddedt"}).p
-        volunteer_links = p.find_all("a", href=True)
-        volunteer_ids = [link["href"].split('/')[-1] for link in volunteer_links]
+        table = div_content.find("table", {"class": "Volunteers-table"})
+        volunteer_links = table.find_all("a", href=True)
+        volunteer_ids = [link["href"].split('/')[-1] for link in volunteer_links if "parkrunner" in link["href"]]
         logger.info(f"{volunteer_ids=}")
         if parkrun_id in volunteer_ids:
             div_results_header = soup.find("div", {"class": "Results-header"})
             location = div_results_header.find("h1").get_text().replace(" parkrun", "")
             span_date = div_results_header.find("span", {"class": "format-date"})
-            parkrun_date = datetime.datetime.strptime(span_date.get_text(), "%d/%m/%Y").date()
+            parkrun_date = datetime.datetime.strptime(span_date.get_text(), "%Y-%m-%d").date()
             span_event = div_results_header.find_all("span")[-1]
             volunteer_event = int(span_event.get_text().replace("#", ""))
             for a in social_account.user.activity_set.all():
