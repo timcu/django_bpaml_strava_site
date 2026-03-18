@@ -49,6 +49,12 @@
 <p>
     <a href="{% url 'save-parkruns-all' %}" title="from Parkrun">fetch all Parkrun results</a>
 </p>
+<p>
+    <a href="{% url 'calculate-deviations-all' %}" title="from Strava">fetch all Strava split data to calculate deviations</a>
+</p>
+<p>
+    <a href="{% url 'athletes-scores' %}" title="from Strava and Parkrun">score all the athletes in the competition and display the results</a>
+</p>
 
 {% endif %}
 {% endblock %}

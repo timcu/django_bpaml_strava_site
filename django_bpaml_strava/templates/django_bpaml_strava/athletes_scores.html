@@ -1,0 +1,88 @@
+{% extends 'django_bpaml_strava/base.html' %}
+{% block main %}
+<h1>Athletes' Scores in Betty's challenge</h1>
+{% if user.is_superuser %}
+<h3>Results - Admin only</h3>
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Volunteered</th>
+        <th>Runs</th>
+        <th>Goal time</th>
+        <th>Shortfall</th>
+        <th>Slowdown</th>
+        <th>Straightness</th>
+        <th>Sandbagging</th>
+        <th>Strava splits</th>
+        <th>Negative splits</th>
+        <th>Deviant splits</th>
+        <th>action</th>
+    </tr>
+    {% for athlete in athletes %}
+        <tr>
+            <td>{{athlete.user.first_name}} {{athlete.user.last_name}}</td>
+            <td>{{athlete.score.volunteers}}</td>
+            <td>{{athlete.score.num_runs}}</td>
+            <td>{{athlete.user.goal_duration}}</td>
+            <td>{{athlete.score.shortfall|floatformat:0}}</td>
+            <td>{{athlete.score.slowdown|floatformat:0}}</td>
+            <td>{{athlete.score.r_value|floatformat:3}}</td>
+            <td>{{athlete.score.sandbagging_slope|floatformat:3}}</td>
+            <td>{{athlete.score.num_strava}}</td>
+            <td>{{athlete.score.num_negative_split}}</td>
+            <td>{{athlete.score.sum_deviant|floatformat:1}}</td>
+            <td>
+                <a href="{% url 'view-activities' athlete.uid %}">view activities</a>
+                <a href="{% url 'view-athlete-chart' athlete.uid %}">chart</a>
+            </td>
+        </tr>
+    {% endfor %}
+</table>
+<h3>Scores - Admin only</h3>
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Volunteered</th>
+        <th>Runs</th>
+        <th>Goal time</th>
+        <th>Shortfall</th>
+        <th>Slowdown</th>
+        <th>Straightness</th>
+        <th>Sandbagging</th>
+        <th>Strava splits</th>
+        <th>Negative splits</th>
+        <th>Deviant splits</th>
+        <th>Total</th>
+        <th>Place</th>
+    </tr>
+    {% for athlete in athletes %}
+        <tr>
+            <td>{{athlete.user.first_name}} {{athlete.user.last_name}}</td>
+            <td>{{athlete.score.score_volunteer}}</td>
+            <td>{{athlete.score.score_num_runs}}</td>
+            <td>{{athlete.score.score_goal_bonus}}</td>
+            <td>{{athlete.score.score_shortfall|floatformat:0}}</td>
+            <td>{{athlete.score.score_slowdown|floatformat:0}}</td>
+            <td>{{athlete.score.score_r_value|floatformat:1}}</td>
+            <td>{{athlete.score.score_sandbagging_slope|floatformat:1}}</td>
+            <td>{{athlete.score.score_num_strava}}</td>
+            <td>{{athlete.score.score_num_negative_split}}</td>
+            <td>{{athlete.score.score_deviant|floatformat:1}}</td>
+            <td>{{athlete.score.total|floatformat:1}}</td>
+            <td>{{athlete.score.place}}</td>
+        </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>Admin permission required to see scores</p>
+{% endif %}
+{% endblock %}
+{% block nav-breadcrumbs %}
+<nav aria-label="Breadcrumbs">
+  <div class="breadcrumbs">
+    <a href="{% url 'index' %}">Athletes</a>
+    &gt;
+    <a href="{% url 'athletes-scores' %}">Athletes' Scores</a>
+  </div>
+</nav>
+{% endblock %}

@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import statistics
+from math import isnan
 from zoneinfo import ZoneInfoNotFoundError
 from itertools import combinations
 
@@ -83,11 +84,54 @@ def index_page(request):
     return render(request, 'django_bpaml_strava/athletes.html', context)
 
 
+@login_required
+def calculate_deviations(request):
+    """Fetch full activity for every strava activity for all active strava id so that splits and standard deviations can be calculated"""
+    list_social_accounts = list_active_strava_accounts()
+    for social_account in list_social_accounts:
+        for activity in social_account.user.activity_set.all():
+            if activity.strava_duration and activity.activity_id and activity.strava_json is None:
+                save_activity_from_id(social_account.uid, activity.activity_id)
+    return redirect("athletes-scores")
+
+
+def athletes_scores(request):
+    """Find all athletes scores and render sorted by place"""
+    list_social_accounts = list_active_strava_accounts()
+    for sa in list_social_accounts:
+        sa.score = score_for_athlete(sa)
+    list_social_accounts = sorted(list_social_accounts, key=lambda a: a.score.get('total', -1000), reverse=True)
+    for i, sa in enumerate(list_social_accounts):
+        sa.score['place'] = i + 1
+    context = {'athletes': list_social_accounts}
+    return render(request, 'django_bpaml_strava/athletes_scores.html', context)
+
+
 def athlete_page(request, strava_id):
     """Find just the one athlete with the supplied strava id"""
     a = social_account_with_sorted_activities(strava_id=strava_id)
     context = {'athlete': a}
     return render(request, 'django_bpaml_strava/athlete.html', context)
+
+
+def pace_std_dev(activity: Activity):
+    if activity is None:
+        return {"lst_pace": [], "std_deviation": 0, "html_deviation": "", "strava_activity": {}}
+    lst_pace = []
+    std_deviation = 0
+    html_deviation = ""
+    strava_activity = {}
+    if hasattr(activity, "strava_json") and activity.strava_json is not None:
+        strava_activity = json.loads(activity.strava_json)
+        for i, split in enumerate(strava_activity.get('splits_metric', [])):
+            speed = split.get('average_speed', 0)
+            if speed and i < 5:
+                lst_pace.append(1000 / speed)
+        if len(lst_pace) > 1:
+            std_deviation = statistics.stdev(lst_pace)
+            lst_pace_formatted = [min_sec(p) for p in lst_pace]
+            html_deviation = "<div>" + ", ".join(lst_pace_formatted) + f"<br>std dev {min_sec(std_deviation)}</div>"
+    return {"lst_pace": lst_pace, "std_deviation": std_deviation, "html_deviation": html_deviation, "strava_activity": strava_activity}
 
 
 def social_account_with_sorted_activities(strava_id: str):
@@ -104,17 +148,9 @@ def social_account_with_sorted_activities(strava_id: str):
         if a.volunteer_event is not None:
             location = re.sub(r'[^a-z]', '', a.location.lower())
             a.volunteer_url = f"https://www.parkrun.com.au/{location}/results/{a.volunteer_event}/"
-        lst_pace = []
-        if a.strava_json is not None:
-            a.strava_activity = json.loads(a.strava_json)
-            for i, split in enumerate(a.strava_activity.get('splits_metric', [])):
-                speed = split.get('average_speed', 0.1)
-                if speed and i < 5:
-                    lst_pace.append(1000/speed)
-            if len(lst_pace) > 1:
-                std_deviation = statistics.stdev(lst_pace)
-                lst_pace_formatted = [min_sec(p) for p in lst_pace]
-                a.html_deviation = "<div>" + ", ".join(lst_pace_formatted) + f"<br>std dev {min_sec(std_deviation)}</div>"
+        dct = pace_std_dev(a)
+        a.html_deviation = dct["html_deviation"]
+        a.strava_activity = dct["strava_activity"]
     return social_account
 
 
@@ -633,55 +669,199 @@ def min_sec(duration) -> str:
     return f"{total_seconds // 60}:{total_seconds % 60:02d}"
 
 
+SLOWDOWN_FACTOR = 1
+RUN_FACTOR = 20
+VOLUNTEER_FACTOR = 50
+SANDBAGGING_FACTOR = 100
+STRAIGHT_FACTOR = 15
+DEVIANT_FACTOR = 0.2
+STRAVA_FACTOR = 0
+NEGATIVE_SPLIT_FACTOR = 4
+GOAL_FACTOR = 1
+GOAL_BONUS = 30
+
+def score_for_dates(goal_duration: datetime.timedelta, volunteers: int, dates: list[datetime.date], durations: list[float], splits: list[list[float]]):
+    # Set best_dates to dates etc so that if this is the highest score then values will be ready to be used
+    dct_score: dict[str, list[datetime.date]|list[float]|float|int] = {
+        "best_dates": dates,
+        "best_durations": durations,
+    }
+    # Set volunteer score
+    dct_score.update({
+        "volunteers": volunteers,
+        "score_volunteer": VOLUNTEER_FACTOR if volunteers > 0 else 0
+    })
+    # Set score for number of runs completed
+    dct_score.update({"num_runs": len(durations), "score_num_runs": len(durations) * RUN_FACTOR})
+    # Fastest time
+    shortfall = max(0.0, int((min(durations)) * 60 + 0.5) -  goal_duration.total_seconds())
+    dct_score.update({"shortfall": shortfall, "score_shortfall": -shortfall * GOAL_FACTOR, "score_goal_bonus": GOAL_BONUS if shortfall == 0 else 0})
+
+    # Calculate climb in times with this set
+    y_prev = None
+    slowdown = 0
+    for i, y in enumerate(durations):
+        if y_prev is not None and y_prev < y:
+            slowdown += y - y_prev
+        y_prev = y
+    dct_score.update({"slowdown": slowdown * 60, "score_slowdown": -slowdown * 60 * SLOWDOWN_FACTOR})
+
+    days = [(d - dates[0]).days for d in dates]
+    slope, intercept, r_value, _, _ = stats.linregress(days, durations)
+    if isnan(r_value):
+        r_value = 0
+        slope = 0
+        intercept = durations[0] if len(durations) > 0 else goal_duration.total_seconds() / 60
+    r_squared = r_value ** 2
+    dct_score.update({"sandbagging_slope": slope, "score_sandbagging_slope": slope * SANDBAGGING_FACTOR if slope < 0 else 0})
+    dct_score.update({"best_fit_intercept": intercept})
+    dct_score.update({"r_value": r_value, "score_r_value": r_squared * STRAIGHT_FACTOR})
+
+    # Calculate standard deviation of splits
+    score_strava = 0
+    num_strava = 0
+    score_negative_split = 0
+    num_negative_split = 0
+    score_deviant = 0
+    sum_deviant = 0
+    for lst_pace in splits:
+        if len(lst_pace) > 3:
+            split_prev = None
+            num_strava += 1
+            for s in lst_pace:
+                if split_prev is not None and split_prev > s:
+                    num_negative_split += 1
+                split_prev = s
+            # Calculate standard deviation for splits
+            sum_deviant += statistics.stdev(lst_pace)
+    dct_score.update({"num_strava": num_strava, "score_num_strava": num_strava * STRAVA_FACTOR})
+    dct_score.update({"num_negative_split": num_negative_split, "score_num_negative_split": num_negative_split * NEGATIVE_SPLIT_FACTOR})
+    # Maximum deviant penalty is bonuses from strava so suppliers of strava data are not penalised for supplying data
+    dct_score.update({"sum_deviant": sum_deviant, "score_deviant": -min(sum_deviant * DEVIANT_FACTOR, num_strava * STRAVA_FACTOR + num_negative_split * NEGATIVE_SPLIT_FACTOR)})
+    total = 0
+    for k, v in dct_score.items():
+        if k.startswith("score"):
+            total += v
+    dct_score.update({"total": total})
+    return dct_score
+
+
+def score_for_athlete(social_account) -> dict[str, list[datetime.date|int|float|str] | int | float] :
+    # Prepare data for scoring and charting
+    dates: list[datetime.date] = []  # parkrun dates where athlete ran
+    durations: list[float] = []  # number of minutes
+    splits: list[list[float]] = []  # list of splits for each parkrun
+    volunteer_dates: list[datetime.date] = []  # parkrun dates where athlete volunteered
+    volunteer_locations: list[str] = []  # locations where athlete volunteered
+    # slope = 0
+    # intercept = social_account.user.goal_duration.total_seconds()/60
+    sa = social_account_with_sorted_activities(social_account.uid)
+    for activity in sa.user.activity_set.all():
+        # Get the fastest duration between the measurements from strava and parkrun
+        fastest = activity.get_fastest()
+        if fastest is not None:
+            dates.append(activity.date)
+            total_seconds = int(fastest.total_seconds())
+            durations.append(total_seconds / 60)  # Convert to minutes
+        if activity.volunteer_event is not None:
+            # Can't volunteer and run on same day
+            location = re.sub(r'[^a-z]', '', activity.location.lower())
+            activity.volunteer_url = f"https://www.parkrun.com.au/{location}/results/{activity.volunteer_event}/"
+            volunteer_dates.append(activity.date)
+            volunteer_locations.append(activity.location)
+        dct = pace_std_dev(activity)
+        splits.append(dct["lst_pace"])
+
+    days: list[int] = [(d - dates[0]).days for d in dates]  # number of days since first date
+
+    if len(dates) > 8:
+        # Find best 8 results that show no increase in time over period
+
+        # Find the best 8 points
+        n_points = min(8, len(dates))
+        highest_indices = None
+        highest_score = {"total": 0}
+
+        # Try all combinations of n_points to see which ones
+        for indices in combinations(range(len(dates)), n_points):
+            # subset_days = [days[i] for i in indices]
+            subset_dates = [dates[i] for i in indices]
+            subset_durations = [durations[i] for i in indices]
+            subset_splits = [splits[i] for i in indices]
+            dct_score = score_for_dates(
+                social_account.user.goal_duration,
+                len(volunteer_dates),
+                subset_dates,
+                subset_durations,
+                subset_splits
+            )
+
+            if highest_indices is None or dct_score["total"] > highest_score["total"]:
+                highest_score = dct_score
+                highest_indices = indices
+    else:
+        highest_score = score_for_dates(
+            social_account.user.goal_duration,
+            len(volunteer_dates),
+            dates,
+            durations,
+            splits
+        )
+        highest_indices = list(range(len(days)))
+    return {
+        "dates": dates,
+        "days": days,
+        "durations": durations,
+        "best_dates": [dates[i] for i in highest_indices],
+        "best_days": [days[i] for i in highest_indices],
+        "best_durations": [durations[i] for i in highest_indices],
+        "volunteer_dates": volunteer_dates,
+        "volunteer_locations": volunteer_locations,
+    } | highest_score
+
+
 @login_required()
 def view_athlete_activity_chart(request, strava_id):
     # Get activities for the user
     social_account = social_account_with_sorted_activities(strava_id=strava_id)
 
     # Prepare data for the chart
-    dates = []
-    durations = []
+    dct_score = score_for_athlete(social_account)
+    dates = dct_score["dates"]
+    days: list[int] = dct_score["days"]
+    durations = dct_score["durations"]
     labels = []
-    volunteer_dates = []
-    volunteer_locations = []
+    volunteer_dates = dct_score["volunteer_dates"]
+    volunteer_locations = dct_score["volunteer_locations"]
     # If not enough datapoints for a line of best fit then plot on horizontal line through goal time
-    slope = 0
-    intercept = social_account.user.goal_duration.total_seconds()/60
+    slope = dct_score["sandbagging_slope"]
+    intercept = dct_score["best_fit_intercept"]  # social_account.user.goal_duration.total_seconds()/60
+    shortfall: int = dct_score["shortfall"]  # number of seconds shortfall
+    slowdown: float = dct_score["slowdown"]  # number of seconds slowdown
+    r_value = dct_score["r_value"]
 
     for activity in social_account.user.activity_set.all():
-        # Get the fastest duration between the two fields
-        fastest = None
-        if activity.parkrun_duration and activity.strava_duration:
-            fastest = min(activity.parkrun_duration, activity.strava_duration)
-        elif activity.parkrun_duration:
-            fastest = activity.parkrun_duration
-        elif activity.strava_duration:
-            fastest = activity.strava_duration
-
+        # Get the fastest duration between the two measurements strava and parkrun
+        fastest = activity.get_fastest()
         if fastest is not None:
-            dates.append(activity.date)
-            total_seconds = int(fastest.total_seconds())
-            durations.append(total_seconds / 60)  # Convert to minutes
-            labels.append(min_sec(fastest))
-
-        if activity.volunteer_event is not None:
-            volunteer_dates.append(activity.date)
-            volunteer_locations.append(activity.location)
+            if activity.location:
+                labels.append(activity.location + "<br>" + min_sec(fastest))
+            else:
+                labels.append(min_sec(fastest))
 
     # Create the Plotly figure
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=dates,
         y=durations,
-        mode='lines+markers+text',
-        name=f'{social_account.user.get_full_name()}',
+        mode='markers+text',
+        name='All runs',  # f'{social_account.user.get_full_name()}',
         text=labels,
         textposition='top center',
         textfont=dict(size=10),
     ))
 
     if len(dates) > 0 and social_account.user.goal_duration:
-        shortfall = int(max(0, min(durations)*60 - social_account.user.goal_duration.total_seconds()))
         if len(dates) == 1:
             # Single data point for goal time
             fig.add_trace(go.Scatter(
@@ -699,89 +879,28 @@ def view_athlete_activity_chart(request, strava_id):
                 name=f'Goal {min_sec(social_account.user.goal_duration)} (shortfall={shortfall}s)',
             ))
 
-    logger.info(f"{len(dates)=}")
     # Convert dates to numeric values (days since first date)
-    x_numeric = np.array([(d - dates[0]).days for d in dates])
-    y_numeric = np.array(durations)
-    if len(dates) > 8:
-        # Find best 8 results that show no increase in time over period
-
-        # Find the best 8 points
-        n_points = min(8, len(dates))
-        lowest_slowdown_indices = []
-        best_indices = None
-        lowest_slowdown = datetime.timedelta(seconds=60*60)
-
-        # Try all combinations of n_points to see which ones
-        for indices in combinations(range(len(dates)), n_points):
-            y_subset = y_numeric[list(indices)]
-
-            # Calculate climb in times with this set
-            y_prev = None
-            slowdown = 0
-            for i, y in enumerate(y_subset):
-                if y_prev is not None and y_prev < y:
-                    slowdown += y - y_prev
-                y_prev = y
-
-            if len(lowest_slowdown_indices) == 0 or slowdown < lowest_slowdown:
-                lowest_slowdown = slowdown
-                lowest_slowdown_indices = [indices]
-            elif slowdown == lowest_slowdown:
-                lowest_slowdown_indices.append(indices)
-
-        # There may be several with the same score so find which ones are straightest
-        best_r_squared = 0
-        for indices in lowest_slowdown_indices:
-            x_subset = x_numeric[list(indices)]
-            y_subset = y_numeric[list(indices)]
-
-            # Calculate R-squared for this subset
-            slope, intercept, r_value, _, _ = stats.linregress(x_subset, y_subset)
-            r_squared = r_value ** 2
-
-            if r_squared > best_r_squared:
-                best_r_squared = r_squared
-                best_indices = indices
-
-        # Calculate final regression with best points
-        x_best = x_numeric[list(best_indices)]
-        y_best = y_numeric[list(best_indices)]
-    else:
-        x_best = x_numeric
-        y_best = y_numeric
-        y_prev = None
-        best_indices = range(len(dates))  # all required because haven't exceeded 8 datapoints
-        # Calculate lowest_slowdown on all points since haven't exceeded 8 datapoints
-        lowest_slowdown = 0
-        for y in y_numeric:
-            if y_prev is not None and y_prev < y:
-                lowest_slowdown += y - y_prev
-            y_prev = y
-
+    best_dates = dct_score["best_dates"]
+    best_durations = dct_score["best_durations"]
     if len(dates) > 1:
-        slope, intercept, r_value, p_value, std_err = stats.linregress(x_best, y_best)
-
         # Create points for the line of best fit across entire date range
         line_x = [dates[0], dates[-1]]
-        line_y = [intercept, slope * x_numeric[-1] + intercept]
+        line_y = [intercept, slope * days[-1] + intercept]
 
         # Add line of best fit
         fig.add_trace(go.Scatter(
             x=line_x,
             y=line_y,
             mode='lines',
-            name=f'Line of best fit (r={r_value:.3f}), {len(x_best)} best points',
+            name=f'Line of best fit (r={r_value:.3f}), {len(best_dates)} best points',
             line=dict(dash='dash', color='green')
         ))
         # Highlight the 8 points used
-        best_dates = [dates[i] for i in best_indices]
-        best_durations = [durations[i] for i in best_indices]
         fig.add_trace(go.Scatter(
             x=best_dates,
             y=best_durations,
-            mode='markers',
-            name=f'Points used for fit (slowdown={int(lowest_slowdown*60+0.5)}s)',
+            mode='lines+markers',
+            name=f'Points used for fit (slowdown={int(slowdown+0.5)}s)',
             marker=dict(size=12, color='green', symbol='circle-open', line=dict(width=2))
         ))
 
