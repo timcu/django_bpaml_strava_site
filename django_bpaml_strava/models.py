@@ -36,3 +36,14 @@ class Activity(models.Model):
 
     def __str__(self):
         return self.title
+
+    def get_fastest(self):
+        """Return the fastest of parkrun duration or strava duration"""
+        if self.parkrun_duration and self.strava_duration:
+            return min(self.parkrun_duration, self.strava_duration)
+        elif self.parkrun_duration:
+            return self.parkrun_duration
+        elif self.strava_duration:
+            return self.strava_duration
+        else:
+            return None
