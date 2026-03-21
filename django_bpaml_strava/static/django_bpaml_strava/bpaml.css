@@ -27,3 +27,7 @@ footer {padding-left: 10px;}
     padding-top: 10px;
   }
 }
+
+/* right align all the scores in the results table */
+table.score th, table.score td {text-align: right;}
+table.score th.name, table.score td.name {text-align: left;}
